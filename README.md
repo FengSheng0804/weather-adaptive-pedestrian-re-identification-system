@@ -1,0 +1,2 @@
+# adaptive-pedestrian-re-identification-system
+这是一个实现基于混合专家的多天气自适应行人再识别系统的代码仓库
