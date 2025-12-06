@@ -11,7 +11,8 @@
 ├── README.md
 ├── datasets
 │   ├── DefogDataset/     # 去雾数据集
-│   └── DerainDataset/    # 去雨数据集
+│   ├── DerainDataset/    # 去雨数据集
+│   └── DesnowDataset/    # 去雾数据集
 ├── fog_removing_model    # 去雾模型 (DEANet)
 │   ├── train_DEANet.py   # 训练脚本
 │   ├── test_DEANet.py    # 测试脚本
@@ -116,13 +117,13 @@ python fog_removing_model/test_DEANet.py --data_dir ./datasets/DefogDataset/test
 #### 测试去雨模型
 
 ```bash
-python rain_removing_model/test_PReNet.py --data_dir ./datasets/DerainDataset/test --weights ./rain_removing_model/weights/net_latest.pth
+python rain_removing_model/test_PReNet.py --data_dir ./datasets/DerainDataset/test --weights ./rain_removing_model/weights/best.pth
 ```
 
 #### 测试去雪模型
 
 ```bash
-python snow_removing_model/test.py --data_dir ./datasets/Snow100K/test --test_model ./snow_removing_model/weights/CSD.pkl
+python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --test_model ./snow_removing_model/weights/best.pkl
 ```
 
 ## 6. 结果
@@ -131,6 +132,5 @@ python snow_removing_model/test.py --data_dir ./datasets/Snow100K/test --test_mo
 
 ## 7. 未来工作
 
-*   添加去雪模型，实现多场景修复。
 *   将去雾、去雨和去雪模块作为MOE的专家子网络训练混合专家模型。
 *   将混合专家模型和行人重识别任务相结合。
