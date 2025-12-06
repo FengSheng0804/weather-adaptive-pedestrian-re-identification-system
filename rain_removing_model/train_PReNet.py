@@ -120,7 +120,7 @@ def train():
         writer.add_image('deraining image', im_derain, epoch+1)
 
         # save model
-        torch.save(model.state_dict(), os.path.join(opt.save_path, 'net_latest.pth'))
+        torch.save(model.state_dict(), os.path.join(opt.save_path, 'best.pth'))
         if epoch % opt.save_freq == 0:
             torch.save(model.state_dict(), os.path.join(opt.save_path, 'net_epoch%d.pth' % (epoch+1)))
 

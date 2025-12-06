@@ -1,6 +1,7 @@
 # 删除数据集
 datasets/DerainDataset/
 datasets/DefogDataset/
+datasets/DesnowDataset/
 
 # 删除测试结果
 fog_removing_model/results/
