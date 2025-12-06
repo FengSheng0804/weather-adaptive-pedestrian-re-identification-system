@@ -1,7 +1,6 @@
 # This code defines a dataset class and data preparation functions for training a rain removal model.
 
 import os
-import os.path
 import numpy as np
 import random
 import h5py

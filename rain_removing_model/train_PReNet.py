@@ -13,7 +13,7 @@ from data.DerainDataset import *
 from utils import *
 from torch.optim.lr_scheduler import MultiStepLR
 from SSIM import SSIM
-from network.PReNet import *
+from model.PReNet import *
 
 
 parser = argparse.ArgumentParser(description="PReNet_train")
