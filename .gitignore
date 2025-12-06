@@ -1,0 +1,6 @@
+# 删除数据集
+datasets/DerainDataset/
+
+# 删除python编译文件
+**/__pycache__/
+**/*.pyc
