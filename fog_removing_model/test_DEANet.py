@@ -22,7 +22,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='DEANet Testing')
 parser.add_argument('--weights_path', type=str, 
-                    default='fog_removing_model\\weights\\net_latest.pth',
+                    default='fog_removing_model\\weights\\best.pth',
                     help='Path to the trained weights file')
 parser.add_argument('--data_path', type=str, 
                     default='datasets\\DefogDataset\\test',
