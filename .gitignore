@@ -1,10 +1,12 @@
 # 删除数据集
 datasets/DerainDataset/
 datasets/DefogDataset/
+datasets/DesnowDataset/
 
 # 删除测试结果
 fog_removing_model/results/
 rain_removing_model/results/
+snow_removing_model/results/
 
 # 删除python编译文件
 **/__pycache__/

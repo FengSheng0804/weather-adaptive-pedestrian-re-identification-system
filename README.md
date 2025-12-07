@@ -10,20 +10,26 @@
 .
 ├── README.md
 ├── datasets
-│   ├── DefogDataset/     # 去雾数据集
-│   └── DerainDataset/    # 去雨数据集
+│   ├── DefogDataset/     # 去雾数据集(HAZE4K)
+│   ├── DerainDataset/    # 去雨数据集(Rain1400)
+│   └── DesnowDataset/    # 去雾数据集(Snow100K)
 ├── fog_removing_model    # 去雾模型 (DEANet)
 │   ├── train_DEANet.py   # 训练脚本
 │   ├── test_DEANet.py    # 测试脚本
 │   ├── model/            # 模型定义
 │   ├── data/             # 数据加载器
 │   └── weights/          # 预训练权重
-└── rain_removing_model   # 去雨模型 (PReNet)
-    ├── train_PReNet.py   # 训练脚本
-    ├── test_PReNet.py    # 测试脚本
+├── rain_removing_model   # 去雨模型 (PReNet)
+│   ├── train_PReNet.py   # 训练脚本
+│   ├── test_PReNet.py    # 测试脚本
+│   ├── model/            # 模型定义
+│   ├── data/             # 数据加载器
+│   └── weights/          # 预训练权重
+└── snow_removing_model   # 去雪模型 (ConvIR)
+    ├── train.py          # 训练脚本
+    ├── test.py           # 测试脚本
     ├── model/            # 模型定义
-    ├── data/             # 数据加载器
-    └── weights/          # 预训练权重
+    └── results/          # 结果保存目录
 ```
 
 ## 3. 数据集
@@ -60,6 +66,14 @@
     *   训练脚本: `rain_removing_model/train_PReNet.py`
     *   测试脚本: `rain_removing_model/test_PReNet.py`
 
+### 4.3 去雪模型: ConvIR
+
+*   **模型描述**: `ConvIR` 是一个用于图像去雪的深度学习模型。
+*   **相关文件**:
+    *   模型结构: `snow_removing_model/model/ConvIR.py`
+    *   训练脚本: `snow_removing_model/train.py`
+    *   测试脚本: `snow_removing_model/test.py`
+
 ## 5. 使用说明
 
 ### 5.1 环境配置
@@ -70,7 +84,7 @@ pip install -r requirements.txt
 ```
 *(注意: 项目中暂未提供 `requirements.txt` 文件，您需要根据代码中的 `import` 手动创建)*
 
-### 5.2 去雾模型
+### 5.2 模型训练
 
 #### 训练去雾模型
 
@@ -78,35 +92,45 @@ pip install -r requirements.txt
 python fog_removing_model/train_DEANet.py --data_dir ./datasets/DefogDataset
 ```
 
-#### 测试去雾模型
-
-测试去雾模型之前，需要使用`reparam.py`文件对`train_DEANet.py`训练出来的模型进行重参数化。
-
-```bash
-python fog_removing_model/test_DEANet.py --data_dir ./datasets/DefogDataset/test --weights ./fog_removing_model/weights/net_latest.pth
-```
-
-
-### 5.3 去雨模型
-
 #### 训练去雨模型
 
 ```bash
 python rain_removing_model/train_PReNet.py --data_dir ./datasets/DerainDataset
 ```
 
+#### 训练去雪模型
+
+```bash
+python snow_removing_model/train.py --data_dir ./datasets/DesnowDataset
+```
+
+### 5.3 模型测试
+
+#### 测试去雾模型
+
+测试去雾模型之前，需要使用`reparam.py`文件对`train_DEANet.py`训练出来的模型进行重参数化。
+
+```bash
+python fog_removing_model/test_DEANet.py --data_dir ./datasets/DefogDataset/test --weights ./fog_removing_model/weights/best.pth
+```
+
 #### 测试去雨模型
 
 ```bash
-python rain_removing_model/test_PReNet.py --data_dir ./datasets/DerainDataset/test --weights ./rain_removing_model/weights/net_latest.pth
+python rain_removing_model/test_PReNet.py --data_dir ./datasets/DerainDataset/test --weights ./rain_removing_model/weights/best.pth
+```
+
+#### 测试去雪模型
+
+```bash
+python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --test_model ./snow_removing_model/weights/best.pkl
 ```
 
 ## 6. 结果
 
-测试结果（包括去雾和去雨后的图像）将保存在相应模型的 `results` 文件夹中。
+测试结果（包括去雾、去雨和去雪后的图像）将保存在相应模型的 `results` 文件夹中。
 
 ## 7. 未来工作
 
-*   添加去雪模型，实现多场景修复。
 *   将去雾、去雨和去雪模块作为MOE的专家子网络训练混合专家模型。
 *   将混合专家模型和行人重识别任务相结合。
