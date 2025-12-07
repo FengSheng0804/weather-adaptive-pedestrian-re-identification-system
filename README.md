@@ -10,9 +10,9 @@
 .
 ├── README.md
 ├── datasets
-│   ├── DefogDataset/     # 去雾数据集
-│   ├── DerainDataset/    # 去雨数据集
-│   └── DesnowDataset/    # 去雾数据集
+│   ├── DefogDataset/     # 去雾数据集(HAZE4K)
+│   ├── DerainDataset/    # 去雨数据集(Rain1400)
+│   └── DesnowDataset/    # 去雾数据集(Snow100K)
 ├── fog_removing_model    # 去雾模型 (DEANet)
 │   ├── train_DEANet.py   # 训练脚本
 │   ├── test_DEANet.py    # 测试脚本
