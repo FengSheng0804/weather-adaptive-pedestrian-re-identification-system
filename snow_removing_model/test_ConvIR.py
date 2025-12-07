@@ -37,7 +37,8 @@ def test(model):
         # ssim_adder = Adder()
 
         for iter_idx, data in enumerate(dataloader):
-            input_img, label_img, name = data
+            # input_img, label_img, name = data
+            input_img, name = data
             input_img = input_img.to(device)
 
             h, w = input_img.shape[2], input_img.shape[3]

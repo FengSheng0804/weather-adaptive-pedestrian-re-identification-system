@@ -30,8 +30,8 @@ def train_dataloader(path, batch_size=64, num_workers=0, use_transform=True):
 def test_dataloader(path, batch_size=1, num_workers=0):
     image_dir = os.path.join(path, 'test')
     dataloader = DataLoader(
-        DeblurDataset(image_dir, is_test=True),
-        
+        # DeblurDataset(image_dir, is_test=True),
+        OnlyPredictDataset(image_dir, is_test=True),
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
@@ -51,6 +51,29 @@ def valid_dataloader(path, batch_size=1, num_workers=0):
 
     return dataloader
 
+
+class OnlyPredictDataset(Dataset):
+    def __init__(self, image_dir, transform=None, is_test=True):
+        self.image_dir = image_dir
+        self.image_list = os.listdir(os.path.join(image_dir, 'snowy_image'))
+        self.transform = transform
+        self.is_test = is_test
+        
+    def __len__(self):
+        return len(self.image_list)
+
+    def __getitem__(self, idx):
+        image = Image.open(os.path.join(self.image_dir, 'snowy_image', self.image_list[idx]))
+        if self.transform:
+            image = self.transform(image)
+        else:
+            image = F.to_tensor(image)
+
+        if self.is_test:
+            name = self.image_list[idx]
+            return image, name
+        return image
+    
 
 class DeblurDataset(Dataset):
     def __init__(self, image_dir, transform=None, is_test=False):
