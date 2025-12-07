@@ -33,8 +33,8 @@ def test(model):
     model.eval()
     factor = 32
     with torch.no_grad():
-        psnr_adder = Adder()
-        ssim_adder = Adder()
+        # psnr_adder = Adder()
+        # ssim_adder = Adder()
 
         for iter_idx, data in enumerate(dataloader):
             input_img, label_img, name = data
@@ -51,32 +51,34 @@ def test(model):
 
             pred_clip = torch.clamp(pred, 0, 1)
 
-            pred_numpy = pred_clip.squeeze(0).cpu().numpy()
-            label_numpy = label_img.squeeze(0).cpu().numpy()
+            # pred_numpy = pred_clip.squeeze(0).cpu().numpy()
+            # label_numpy = label_img.squeeze(0).cpu().numpy()
 
 
             if args.save_image:
                 save_name = os.path.join(args.result_dir, name[0])
                 pred_clip += 0.5 / 255
                 pred = functional.to_pil_image(pred_clip.squeeze(0).cpu(), 'RGB')
+                print( "Saving image:", save_name)
                 pred.save(save_name)
 
 
-            label_img = (label_img).cuda()
-            down_ratio = max(1, round(min(H, W) / 256))
-            ssim_val = ssim(F.adaptive_avg_pool2d(pred_clip, (int(H / down_ratio), int(W / down_ratio))), 
-                            F.adaptive_avg_pool2d(label_img, (int(H / down_ratio), int(W / down_ratio))), 
-                            data_range=1, size_average=False)	
-            ssim_adder(ssim_val)
+        # # 计算SSIM和PSNR
+        #     label_img = (label_img).cuda()
+        #     down_ratio = max(1, round(min(H, W) / 256))
+        #     ssim_val = ssim(F.adaptive_avg_pool2d(pred_clip, (int(H / down_ratio), int(W / down_ratio))), 
+        #                     F.adaptive_avg_pool2d(label_img, (int(H / down_ratio), int(W / down_ratio))), 
+        #                     data_range=1, size_average=False)	
+        #     ssim_adder(ssim_val)
            
-            psnr = peak_signal_noise_ratio(pred_numpy, label_numpy, data_range=1)
-            psnr_adder(psnr)
+        #     psnr = peak_signal_noise_ratio(pred_numpy, label_numpy, data_range=1)
+        #     psnr_adder(psnr)
 
-            print('%d iter PSNR: %.2f SSIM: %f' % (iter_idx + 1, psnr, ssim_val))
+        #     print('%d iter PSNR: %.2f SSIM: %f' % (iter_idx + 1, psnr, ssim_val))
 
-        print('==========================================================')
-        print('The average PSNR is %.2f dB' % (psnr_adder.average()))
-        print('The average SSIM is %.4f' % (ssim_adder.average()))
+        # print('==========================================================')
+        # print('The average PSNR is %.2f dB' % (psnr_adder.average()))
+        # print('The average SSIM is %.4f' % (ssim_adder.average()))
 
 if __name__ == '__main__':
     model = ConvIR()
