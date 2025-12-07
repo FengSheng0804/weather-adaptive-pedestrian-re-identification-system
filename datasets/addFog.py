@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+import os
 
 def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8), use_depth_map=False, depth_map=None):
     """
@@ -63,23 +64,27 @@ def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8)
     return fogged_img
 
 if __name__ == "__main__":
-    # 读取原始图像
-    original_path = "ground_truth.png"  # 请替换为您的图像路径
-    original_img = cv2.imread(original_path)
-    
-    if original_img is None:
-        print("错误：无法读取图像，请检查路径！")
-        exit()
-    
-    fog_result = add_fog(
-        original_image=original_img,
-        beta_range=(0, 0.08),
-        brightness_range=(0.6, 0.8)
-    )
-    
-    # 保存结果
-    cv2.imwrite("fog_result.jpg", fog_result)
-    
-    cv2.imshow("Foggy_image", fog_result)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_dir', type=str, default=r'datasets/DefogDataset/train/ground_truth', help='输入图片文件夹')
+    parser.add_argument('--output_dir', type=str, default=r'datasets/DefogDataset/train/foggy_image', help='输出图片文件夹')
+    parser.add_argument('--num', type=int, default=5, help='每张图片生成的加雾效果数量')
+    args = parser.parse_args()
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    for fname in os.listdir(args.input_dir):
+        if fname.lower().endswith('.jpg'):
+            img_path = os.path.join(args.input_dir, fname)
+            img = cv2.imread(img_path)
+            for i in range(1, args.num + 1):
+                fog_img = add_fog(
+                    original_image=img,
+                    beta_range=(0, 0.08),
+                    brightness_range=(0.6, 0.8)
+                )
+                out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
+                out_path = os.path.join(args.output_dir, out_name)
+                cv2.imwrite(out_path, fog_img)
+                print(f"已保存: {out_path}")

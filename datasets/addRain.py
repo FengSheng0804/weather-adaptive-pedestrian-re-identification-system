@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import random
+import os
 
 def motion_blur_kernel(length, angle):
     """生成运动模糊核（模拟雨的运动轨迹）"""
@@ -115,28 +116,33 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
 
 
 if __name__ == "__main__":
-    # 1. 读取原始图像
-    original_path = "datasets/ground_truth.jpg"
-    original_img = cv2.imread(original_path)
-    if original_img is None:
-        print("错误：无法读取图像，请检查路径！")
-        exit()
-    
-    # 2. 添加雨效果 - 针对您的图片优化参数
-    rainy_result = add_rain(
-        original_image=original_img,                    # 原始图像
-        rain_count_range=(1000, 3000),                  # 适当减少雨线数量，避免过度密集
-        rain_length_range=(12, 25),                     # 中等长度雨线
-        rain_width_range=(1, 2),                        # 细雨线
-        rain_alpha_range=(0.2, 0.5),                    # 提高透明度，使雨滴更明显但不发黑
-        blur_angle_range=(60, 120),                     # 雨滴倾斜角度
-        blur_length_range=(15, 45),                     # 适中的运动模糊
-        rain_brightness=240,                            # 提高雨滴亮度
-        rain_color=(255, 255, 255)                      # 白色雨滴
-    )
-    
-    # 3. 保存+显示结果
-    cv2.imwrite("rainy_result.jpg", rainy_result)
-    # cv2.imshow("Rain Effect", rainy_result)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_dir', type=str, default=r'datasets\DerainDataset\train\ground_truth', help='输入图片文件夹')
+    parser.add_argument('--output_dir', type=str, default=r'datasets\DerainDataset\train\rainy_image', help='输出图片文件夹')
+    parser.add_argument('--num', type=int, default=5, help='每张图片生成的加雨效果数量')
+    args = parser.parse_args()
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    for fname in os.listdir(args.input_dir):
+        if fname.lower().endswith(('.jpg')):
+            img_path = os.path.join(args.input_dir, fname)
+            img = cv2.imread(img_path)
+            for i in range(1, args.num + 1):
+                rain_img = add_rain(
+                    original_image=img,                             # 原始图像
+                    rain_count_range=(100, 2000),                   # 适当减少雨线数量，避免过度密集
+                    rain_length_range=(12, 25),                     # 中等长度雨线
+                    rain_width_range=(1, 2),                        # 细雨线
+                    rain_alpha_range=(0.1, 0.5),                    # 提高透明度，使雨滴更明显但不发黑
+                    blur_angle_range=(60, 120),                     # 雨滴倾斜角度
+                    blur_length_range=(15, 25),                     # 适中的运动模糊
+                    rain_brightness=240,                            # 提高雨滴亮度
+                    rain_color=(255, 255, 255)                      # 白色雨滴
+                )
+                out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
+                out_path = os.path.join(args.output_dir, out_name)
+                cv2.imwrite(out_path, rain_img)
+                print(f"已保存: {out_path}")

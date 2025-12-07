@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import random
 import math
+import os
 
 def create_motion_blur_kernel(size=15, angle=0):
     """创建任意角度的运动模糊核"""
@@ -168,27 +169,32 @@ def add_snow_to_image(
     return result
 
 if __name__ == "__main__":
-    # 1. 读取原始图像
-    original_path = "ground_truth.jpg"  # 替换为你的原图路径
-    original_img = cv2.imread(original_path)
-    if original_img is None:
-        print("错误：无法读取图像，请检查路径！")
-        exit()
-    
-    # 2. 添加雪花效果
-    snowy_result = add_snow_to_image(
-        original_image=original_img,
-        snow_count=(200, 1500),  # 增加雪花数量
-        snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
-        small_radio=(0.75, 0.95),  # 增加小雪花比例
-        alpha=(0.2, 0.3),
-        wind_speed=((1, 5), (1, 2)),  # 增加风速
-        blur_angle_variance=20,
-        snow_intensity=0.8  # 增加雪花强度
-    )
-    
-    # 3. 保存+显示结果
-    cv2.imwrite("snowy_result.jpg", snowy_result)
-    # cv2.imshow("Snow Effect", snowy_result)
-    # cv2.waitKey(0)
-    # cv2.destroyAllWindows()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_dir', type=str, default=r'datasets/DesnowDataset/train/ground_truth', help='输入图片文件夹')
+    parser.add_argument('--output_dir', type=str, default=r'datasets/DesnowDataset/train/snowy_image', help='输出图片文件夹')
+    parser.add_argument('--num', type=int, default=1, help='每张图片生成的加雪效果数量')
+    args = parser.parse_args()
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    for fname in os.listdir(args.input_dir):
+        if fname.lower().endswith('.jpg'):
+            img_path = os.path.join(args.input_dir, fname)
+            img = cv2.imread(img_path)
+            for i in range(1, args.num + 1):
+                snow_img = add_snow_to_image(
+                    original_image=img,
+                    snow_count=(200, 1500),  # 增加雪花数量
+                    snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
+                    small_radio=(0.75, 0.95),  # 增加小雪花比例
+                    alpha=(0.2, 0.3),
+                    wind_speed=((1, 5), (1, 2)),  # 增加风速
+                    blur_angle_variance=20,
+                    snow_intensity=0.8  # 增加雪花强度
+                )
+                out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
+                out_path = os.path.join(args.output_dir, out_name)
+                cv2.imwrite(out_path, snow_img)
+                print(f"已保存: {out_path}")
