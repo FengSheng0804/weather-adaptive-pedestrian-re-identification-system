@@ -82,7 +82,7 @@ def add_snow_to_image(
             center = (temp_size // 2, temp_size // 2)
             
             # 多种雪花形状
-            shape_type = random.choice(["ellipse", "circle", "star"])
+            shape_type = random.choice(["ellipse", "circle"])
             
             if shape_type == "ellipse":
                 axes = (size, max(1, size // 2))
@@ -135,8 +135,11 @@ def add_snow_to_image(
 
 
     # 将雪花蒙版限制在合理范围内
-    snow_mask = np.clip(snow_mask, 0, 1)
-    
+    snow_mask_before = np.clip(snow_mask, 0, 1)
+
+    # 应用高斯模糊使雪花边缘更柔和
+    snow_mask = cv2.GaussianBlur(snow_mask_before, (5, 5), 0)
+
     # 创建白色雪花图层
     white_snow = np.ones((h, w, 3), dtype=np.float32) * (snow_brightness / 255.0)
     
@@ -190,7 +193,7 @@ if __name__ == "__main__":
                     snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
                     small_radio=(0.75, 0.95),  # 增加小雪花比例
                     alpha=(0.2, 0.3),
-                    wind_speed=((1, 5), (1, 2)),  # 增加风速
+                    wind_speed=((1, 2), (1, 2)),  # 增加风速
                     blur_angle_variance=20,
                     snow_intensity=0.8  # 增加雪花强度
                 )
