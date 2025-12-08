@@ -120,9 +120,6 @@ import shutil
 
 
 def rename_and_shuffle_images(dir_path, class_name, mode):
-    """
-    Randomly shuffles all .jpg images in dir_path and renames them to 'fog_gt_1.jpg', 'fog_gt_2.jpg', etc.
-    """
     if mode in dir_path:
         if not os.path.isdir(dir_path):
             print(f"Directory not found: {dir_path}")
@@ -135,7 +132,7 @@ def rename_and_shuffle_images(dir_path, class_name, mode):
 
         for idx, filename in enumerate(image_files, start=1):
             src_path = os.path.join(dir_path, filename)
-            new_filename = f"{class_name}_gt_{mode}_{idx}.jpg"
+            new_filename = f"{class_name}_{mode}_{idx}.jpg"
             dst_path = os.path.join(dir_path, new_filename)
             os.rename(src_path, dst_path)
             print(f"Renamed '{filename}' to '{new_filename}'")
