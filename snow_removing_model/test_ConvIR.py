@@ -13,15 +13,16 @@ parser = argparse.ArgumentParser()
 
 # Directories
 parser.add_argument('--data_dir', type=str, default='datasets/DesnowDataset')
+parser.add_argument('--result_dir', type=str, default='snow_removing_model/results', help='path to save result files')
 
 # Test
 parser.add_argument('--test_model', type=str, default='snow_removing_model/weights/best.pkl')
 parser.add_argument('--save_image', type=bool, default=True, choices=[True, False])
 
 args = parser.parse_args()
-args.result_dir = os.path.join('snow_removing_model', 'results')
-if not os.path.exists(args.result_dir):
-    os.makedirs(args.result_dir)
+args.predict_result_dir = os.path.join(args.result_dir, 'predict')
+if not os.path.exists(args.predict_result_dir):
+    os.makedirs(args.predict_result_dir)
 
 
 def test(model):
@@ -57,7 +58,7 @@ def test(model):
 
 
             if args.save_image:
-                save_name = os.path.join(args.result_dir, name[0])
+                save_name = os.path.join(args.predict_result_dir, name[0])
                 pred_clip += 0.5 / 255
                 pred = functional.to_pil_image(pred_clip.squeeze(0).cpu(), 'RGB')
                 print( "Saving image:", save_name)
