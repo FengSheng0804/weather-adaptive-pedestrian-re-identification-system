@@ -42,7 +42,7 @@ def convert_adc(w):
     conv_weight_ad = Rearrange('c_in c_out (k1 k2) -> c_in c_out k1 k2', k1=conv_shape[2], k2=conv_shape[3])(conv_weight_ad)
     return conv_weight_ad
 
-saved_model_path = '../trained_models/ITS/PSNR4020_SSIM9934.pk'
+saved_model_path = 'fog_removing_model\\weights\\best.pk'
 ckp = torch.load(saved_model_path)
 ckp = ckp['model']
 simplified_ckp = {}
