@@ -29,7 +29,7 @@ def create_motion_blur_kernel(size=15, angle=0):
     
     return kernel
 
-def add_snow_to_image(
+def add_snow(
     original_image,
     snow_count=(800, 2500),
     snow_size_range=((1, 2), (3, 4)),
@@ -187,7 +187,7 @@ if __name__ == "__main__":
             img_path = os.path.join(args.input_dir, fname)
             img = cv2.imread(img_path)
             for i in range(1, args.num + 1):
-                snow_img = add_snow_to_image(
+                snow_img = add_snow(
                     original_image=img,
                     snow_count=(200, 1500),  # 增加雪花数量
                     snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸

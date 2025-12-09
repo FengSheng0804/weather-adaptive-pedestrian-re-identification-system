@@ -2,6 +2,7 @@
 datasets/DerainDataset/
 datasets/DefogDataset/
 datasets/DesnowDataset/
+datasets/MoEDataset/
 
 # 删除测试结果
 fog_removing_model/results/
