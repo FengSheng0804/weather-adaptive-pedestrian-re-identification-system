@@ -20,24 +20,31 @@ def get_clear_name(hazy_name):
 
 
 class TrainDataset(data.Dataset):
-    def __init__(self, hazy_path, clear_path):
+    def __init__(self, hazy_path, clear_path, crop_size=256):
         super(TrainDataset, self).__init__()
         self.hazy_path = hazy_path
         self.clear_path = clear_path
         self.hazy_image_list = [f for f in os.listdir(hazy_path) if is_image_file(f)]
         self.hazy_image_list.sort()
+        self.crop_size = crop_size
 
     def __getitem__(self, index):
         hazy_image_name = self.hazy_image_list[index]
         clear_image_name = get_clear_name(hazy_image_name)
+        
         hazy_image_path = os.path.join(self.hazy_path, hazy_image_name)
         clear_image_path = os.path.join(self.clear_path, clear_image_name)
+        
         hazy = Image.open(hazy_image_path).convert('RGB')
         clear = Image.open(clear_image_path).convert('RGB')
-        crop_params = RandomCrop.get_params(hazy, [256, 256])
+
+        # 采用随机裁剪和旋转增强
+        crop_params = RandomCrop.get_params(hazy, [self.crop_size, self.crop_size])
         rotate_params = random.randint(0, 3) * 90
+        # 随机裁剪
         hazy = crop(hazy, *crop_params)
         clear = crop(clear, *crop_params)
+        # 随机旋转
         hazy = rotate(hazy, rotate_params)
         clear = rotate(clear, rotate_params)
         to_tensor = ToTensor()

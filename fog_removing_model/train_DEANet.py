@@ -228,7 +228,7 @@ if __name__ == "__main__":
     set_seed_torch(42)
 
     train_dir = os.path.join(opt.data_dir, 'train')
-    full_dataset = TrainDataset(os.path.join(train_dir, 'foggy_image'), os.path.join(train_dir, 'ground_truth'))
+    full_dataset = TrainDataset(os.path.join(train_dir, 'foggy_image'), os.path.join(train_dir, 'ground_truth'), crop_size=256)
     
     # 划分训练集和验证集
     validation_split = 0.2

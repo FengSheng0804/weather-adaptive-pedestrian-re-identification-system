@@ -42,6 +42,8 @@ def test():
 
     time_test = 0
     count = 0
+
+    # test的时候需要将batch_size设置为1，以便处理不同尺寸的图片
     loader = test_dataloader(opt.data_path, batch_size=1, num_workers=0)
     for img_tensor, img_name in loader:
         img = img_tensor
