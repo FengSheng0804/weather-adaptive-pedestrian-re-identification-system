@@ -10,7 +10,7 @@ import random
 
 from logger.logger import plot_loss_log, plot_psnr_log
 from SSIM import psnr, ssim
-from fog_removing_model.model.backbone_train import DEANet
+from models.backbone_train import DEANet
 from loss.contrast_loss import ContrastLoss
 from data.data_loader import TrainDataset, TestDataset, ValDataset
 

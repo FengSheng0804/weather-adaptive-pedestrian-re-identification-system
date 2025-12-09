@@ -45,6 +45,7 @@ class SCM(nn.Module):
         x = self.main(x)
         return x
 
+
 class FAM(nn.Module):
     def __init__(self, channel):
         super(FAM, self).__init__()

@@ -11,7 +11,7 @@ from data.DerainDataset import *
 from utils import *
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from SSIM import SSIM
-from model.PReNet import *
+from models.PReNet import *
 
 
 parser = argparse.ArgumentParser(description="PReNet_train")
