@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 from utils import *
-from model.PReNet import *
+from models.PReNet import *
 from data.DerainDataset import test_dataloader
 import time
 

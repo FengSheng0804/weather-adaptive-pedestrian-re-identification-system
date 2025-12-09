@@ -14,8 +14,8 @@ import sys
 # Add the parent directory to the path to allow imports from sibling directories
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fog_removing_model.model.backbone_train import DEANet
-from model.backbone import Backbone
+from models.backbone_train import DEANet
+from models.backbone import Backbone
 from utils import pad_img
 import argparse
 

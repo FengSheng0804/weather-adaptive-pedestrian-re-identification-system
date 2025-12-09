@@ -6,7 +6,7 @@ from utils import Adder
 from data import test_dataloader
 from skimage.metrics import peak_signal_noise_ratio
 import torch.nn.functional as F
-from model.ConvIR import ConvIR
+from models.ConvIR import ConvIR
 import argparse
 
 parser = argparse.ArgumentParser()

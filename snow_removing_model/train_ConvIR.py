@@ -6,7 +6,7 @@ from data import train_dataloader
 from utils import Adder, Timer
 from valid import valid
 from torch.utils.tensorboard import SummaryWriter
-from model.ConvIR import ConvIR
+from models.ConvIR import ConvIR
 from warmup_scheduler import GradualWarmupScheduler
 from pytorch_msssim import ssim
 
