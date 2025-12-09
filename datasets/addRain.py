@@ -53,7 +53,7 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
     rain_count = random.randint(*rain_count_range)
     
     for _ in range(rain_count):
-        # 随机生成雨线起点（允许从图像上方外部开始）
+        # 随机生成雨线起点（允许从图像上方外部开始），要尽可能均匀分布
         x1 = random.randint(0, w)
         y1 = random.randint(-rain_length_range[1], h)
         
@@ -133,12 +133,12 @@ if __name__ == "__main__":
             for i in range(1, args.num + 1):
                 rain_img = add_rain(
                     original_image=img,                             # 原始图像
-                    rain_count_range=(100, 2000),                   # 适当减少雨线数量，避免过度密集
-                    rain_length_range=(12, 25),                     # 中等长度雨线
-                    rain_width_range=(1, 2),                        # 细雨线
-                    rain_alpha_range=(0.1, 0.5),                    # 提高透明度，使雨滴更明显但不发黑
-                    blur_angle_range=(60, 120),                     # 雨滴倾斜角度
-                    blur_length_range=(15, 25),                     # 适中的运动模糊
+                    rain_count_range=(100, 800),                    # 适当减少雨线数量，避免过度密集
+                    rain_length_range=(8, 30),                      # 中等长度雨线
+                    rain_width_range=(1, 1),                        # 细雨线
+                    rain_alpha_range=(0.3, 0.6),                    # 提高透明度，使雨滴更明显但不发黑
+                    blur_angle_range=(70, 110),                     # 雨滴倾斜角度
+                    blur_length_range=(3, 5),                       # 适中的运动模糊
                     rain_brightness=240,                            # 提高雨滴亮度
                     rain_color=(255, 255, 255)                      # 白色雨滴
                 )
