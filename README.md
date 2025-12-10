@@ -142,3 +142,36 @@ python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --te
    1. 解决办法：使用分块训练的方法。
 
 2. MoE架构的数据集如何生成？
+
+3. 在加载预训练模型的时候，对于DEANet，使用`fog_removing_model/models/backbone_train.py`中的DEANet的网络结构无法正常加载`fog_removing_model\weights\best_before_reparam.pk`模型？
+   1. 原因是在于，在训练DEANet.py的时候，保存网络结构之前，会使用`DataParallal`对网络进行处理:
+   ```python
+    if opt.device == 'cuda':
+    net = torch.nn.DataParallel(net)
+    cudnn.benchmark = True
+   ```
+   导致在保存模型的参数的时候，会自动加上`module.`前缀，使得参数不能正常加载，因此需要使用专门的函数将该前缀删除:
+   ```python
+    def remove_module_prefix(state_dict):
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if k.startswith('module.'):
+                new_state_dict[k[7:]] = v
+            else:
+                new_state_dict[k] = v
+        return new_state_dict
+   ```
+   这样才能正常加载网络模型。
+   如果参数对应不上，可以通过以下方式对模型的参数进行检查，同时需要注意保存模型的时候是否直接保存的参数，如果不是，可能还需要通过访问字典['model']才可以加载参数。
+   ```python
+    convir_model = ConvIRExpert(return_features=False)
+    missing_keys, unexpected_keys = convir_model.load_state_dict(torch.load('weather_removing_model/weights/ConvIR_pretrained.pkl')['model'], strict=False)
+    print("=" * 50)
+    if missing_keys:
+        print("Missing keys:", missing_keys)
+    if unexpected_keys:
+        print("Unexpected keys:", unexpected_keys)
+   ```
+4. 
+   

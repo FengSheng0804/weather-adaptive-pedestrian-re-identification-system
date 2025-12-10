@@ -1,1 +1,3 @@
 # 该文件夹用于实现完整的MoE架构去除天气环境
+
+相当于是整合了fog_removing_model，rain_removing_model以及snow_removing_model
