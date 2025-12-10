@@ -2,11 +2,15 @@
 datasets/DerainDataset/
 datasets/DefogDataset/
 datasets/DesnowDataset/
+datasets/MoEDataset/
 
 # 删除测试结果
 fog_removing_model/results/
 rain_removing_model/results/
 snow_removing_model/results/
+
+# 删除模型权重文件
+fog_removing_model/weights/best_before_reparam.pk
 
 # 删除python编译文件
 **/__pycache__/

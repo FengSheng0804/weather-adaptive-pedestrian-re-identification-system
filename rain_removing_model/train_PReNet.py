@@ -1,9 +1,7 @@
 # This code is used to train a rain removal model using PReNet.
 import os
 import argparse
-import numpy as np
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import torchvision.utils as utils
 from torch.autograd import Variable
@@ -11,21 +9,19 @@ from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
 from data.DerainDataset import *
 from utils import *
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from SSIM import SSIM
-from model.PReNet import *
+from models.PReNet import *
 
 
 parser = argparse.ArgumentParser(description="PReNet_train")
-# 在pretrain了一次后，可以将preprocess设为False，避免每次都重新处理数据
-parser.add_argument("--preprocess", type=bool, default=False, help='run prepare_data or not')
 parser.add_argument("--data_path",type=str, default="datasets/DerainDataset/train",help='path to training data')
-parser.add_argument("--save_path", type=str, default="rain_removing_model/weights", help='path to save models and log files')
+parser.add_argument("--log_save_path", type=str, default="rain_removing_model/results/logs", help='path to save log files')
+parser.add_argument("--model_save_path", type=str, default="rain_removing_model/weights", help='path to save model files')
 parser.add_argument("--save_freq",type=int,default=1,help='save intermediate model')
-parser.add_argument("--batch_size", type=int, default=18, help="Training batch size")
-parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
-parser.add_argument("--milestone", type=int, default=[30,50,80], help="When to decay learning rate")
-parser.add_argument("--lr", type=float, default=1e-3, help="initial learning rate")
+parser.add_argument("--batch_size", type=int, default=8, help="Training batch size")
+parser.add_argument("--epochs", type=int, default=40, help="Number of training epochs")
+parser.add_argument("--lr", type=float, default=5e-4, help="initial learning rate")
 parser.add_argument("--use_gpu", type=bool, default=True, help='use GPU or not')
 parser.add_argument("--gpu_id", type=str, default="0", help='GPU id')
 parser.add_argument("--recurrent_iter", type=int, default=6, help='number of recursive stages')
@@ -38,9 +34,13 @@ if opt.use_gpu:
 def train():
 
     print('Loading dataset ...\n')
-    dataset_train = Dataset(data_path=opt.data_path)
-    loader_train = DataLoader(dataset=dataset_train, num_workers=4, batch_size=opt.batch_size, shuffle=True)
-    print("# of training samples: %d\n" % int(len(dataset_train)))
+    loader_train = train_dataloader(
+        data_path=opt.data_path,
+        batch_size=opt.batch_size,
+        num_workers=4,
+        use_patch=True
+    )
+    print("# of training samples: %d\n" % len(loader_train.dataset))
 
     # Build model
     model = PReNet(recurrent_iter=opt.recurrent_iter, use_GPU=opt.use_gpu)
@@ -56,22 +56,22 @@ def train():
         criterion.cuda()
 
     # Optimizer
-    optimizer = optim.Adam(model.parameters(), lr=opt.lr)
-    scheduler = MultiStepLR(optimizer, milestones=opt.milestone, gamma=0.2)  # learning rates
+    optimizer = optim.AdamW(model.parameters(), lr=opt.lr)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
 
     # record training
-    writer = SummaryWriter(opt.save_path)
+    writer = SummaryWriter(opt.log_save_path)
 
     # load the lastest model
-    initial_epoch = findLastCheckpoint(save_dir=opt.save_path)
+    initial_epoch = findLastCheckpoint(save_dir=opt.model_save_path)  # load the lastest model in matconvnet style
     if initial_epoch > 0:
         print('resuming by loading epoch %d' % initial_epoch)
-        model.load_state_dict(torch.load(os.path.join(opt.save_path, 'net_epoch%d.pth' % initial_epoch)))
+        model.load_state_dict(torch.load(os.path.join(opt.model_save_path, 'net_epoch%d.pth' % initial_epoch)))
 
     # start training
     step = 0
+    best_psnr = 0.0
     for epoch in range(initial_epoch, opt.epochs):
-        scheduler.step(epoch)
         for param_group in optimizer.param_groups:
             print('learning rate %f' % param_group["lr"])
 
@@ -107,6 +107,8 @@ def train():
                 writer.add_scalar('PSNR on training data', psnr_train, step)
             step += 1
         ## epoch training end
+        # 自适应调整学习率
+        scheduler.step(loss.item())
 
         # log the images
         model.eval()
@@ -120,13 +122,14 @@ def train():
         writer.add_image('deraining image', im_derain, epoch+1)
 
         # save model
-        torch.save(model.state_dict(), os.path.join(opt.save_path, 'best.pth'))
+        if psnr_train > best_psnr:
+            best_psnr = psnr_train
+            torch.save(model.state_dict(), os.path.join(opt.model_save_path, 'best.pth'))
+            print(f"[epoch {epoch+1}] best.pth updated, PSNR: {psnr_train:.4f}")
         if epoch % opt.save_freq == 0:
-            torch.save(model.state_dict(), os.path.join(opt.save_path, 'net_epoch%d.pth' % (epoch+1)))
+            torch.save(model.state_dict(), os.path.join(opt.model_save_path, 'net_epoch%d.pth' % (epoch+1)))
 
 
 if __name__ == "__main__":
-    if opt.preprocess:
-        prepare_data(data_path=opt.data_path, patch_size=100, stride=100)
-
+    # train时的pic_size应该和推理测试时的一致
     train()

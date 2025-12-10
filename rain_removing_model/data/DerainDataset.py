@@ -2,111 +2,81 @@
 
 import os
 import numpy as np
-import random
-import h5py
 import torch
 import cv2
-import glob
-import torch.utils.data as udata
-from utils import *
+from torch.utils.data import Dataset, DataLoader
 
-
-def Im2Patch(img, win, stride=1):
-    k = 0
-    endc = img.shape[0]
-    endw = img.shape[1]
-    endh = img.shape[2]
-    patch = img[:, 0:endw - win + 0 + 1:stride, 0:endh - win + 0 + 1:stride]
-    TotalPatNum = patch.shape[1] * patch.shape[2]
-    Y = np.zeros([endc, win * win, TotalPatNum], np.float32)
-
-    for i in range(win):
-        for j in range(win):
-            patch = img[:, i:endw - win + i + 1:stride, j:endh - win + j + 1:stride]
-            Y[:, k, :] = np.array(patch[:]).reshape(endc, TotalPatNum)
-            k = k + 1
-    return Y.reshape([endc, win, win, TotalPatNum])
-
-
-def prepare_data(data_path, patch_size, stride):
-    # train
-    print('process training data')
-    input_path = os.path.join(data_path, 'rainy_image')
-    target_path = os.path.join(data_path, 'ground_truth')
-
-    save_target_path = os.path.join(data_path, 'train_target.h5')
-    save_input_path = os.path.join(data_path, 'train_input.h5')
-
-    target_h5f = h5py.File(save_target_path, 'w')
-    input_h5f = h5py.File(save_input_path, 'w')
-
-    train_num = 0
-    input_files = glob.glob(os.path.join(input_path, '*.jpg'))
-    target_files = glob.glob(os.path.join(target_path, '*.jpg'))
-
-    for i in range(len(target_files)):
-        target = cv2.imread(os.path.normpath(target_files[i]))
-        b, g, r = cv2.split(target)
-        target = cv2.merge([r, g, b])
-
-        input = cv2.imread(os.path.normpath(input_files[i]))
-        b, g, r = cv2.split(input)
-        input = cv2.merge([r, g, b])
-
-        target_patches = Im2Patch(target, win=patch_size, stride=stride)
-        input_patches = Im2Patch(input, win=patch_size, stride=stride)
-
-        target_img = target
-        target_img = np.float32(normalize(target_img))
-        input_img = input
-        input_img = np.float32(normalize(input_img))
-
-        for n in range(target_patches.shape[3]):
-            target_data = target_patches[:, :, :, n].copy()
-            target_h5f.create_dataset(str(train_num), data=target_data)
-
-            input_data = input_patches[:, :, :, n].copy()
-            input_h5f.create_dataset(str(train_num), data=input_data)
-            train_num += 1
-
-    target_h5f.close()
-    input_h5f.close()
-    print('training set, # samples %d\n' % train_num)
-
-
-class Dataset(udata.Dataset):
-    def __init__(self, data_path='.'):
-        super(Dataset, self).__init__()
-
+class DerainPatchDataset(Dataset):
+    def __init__(self, data_path, patch_size=256, use_patch=True):
         self.data_path = data_path
-
-        target_path = os.path.join(self.data_path, 'train_target.h5')
-        input_path = os.path.join(self.data_path, 'train_input.h5')
-
-        target_h5f = h5py.File(target_path, 'r')
-        input_h5f = h5py.File(input_path, 'r')
-
-        self.keys = list(target_h5f.keys())
-        random.shuffle(self.keys)
-        target_h5f.close()
-        input_h5f.close()
+        self.input_dir = os.path.join(self.data_path, 'rainy_image')
+        self.target_dir = os.path.join(self.data_path, 'ground_truth')
+        self.img_exts = ['.jpg', '.png', '.jpeg', '.bmp']
+        self.input_files = [f for f in os.listdir(self.input_dir) if any(f.lower().endswith(ext) for ext in self.img_exts)]
+        self.input_files.sort()
+        self.target_files = [f for f in os.listdir(self.target_dir) if any(f.lower().endswith(ext) for ext in self.img_exts)]
+        self.target_files.sort()
+        # ground_truth的文件名为rain_train_1.jpg，rainy_image的文件名为rain_train_1_1.jpg
+        self.pairs = [(os.path.join(self.input_dir, f), os.path.join(self.target_dir, '_'.join(f.split('_')[:-1]) + '.jpg'))
+                      for f in self.input_files if '_'.join(f.split('_')[:-1]) + '.jpg' in self.target_files]
+        self.patch_size = patch_size
+        self.use_patch = use_patch
 
     def __len__(self):
-        return len(self.keys)
+        return len(self.pairs)
 
     def __getitem__(self, index):
+        input_path, target_path = self.pairs[index]
+        input_img = cv2.imread(input_path)
+        target_img = cv2.imread(target_path)
+        # BGR to RGB
+        input_img = cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB)
+        target_img = cv2.cvtColor(target_img, cv2.COLOR_BGR2RGB)
+        if self.use_patch:
+            h, w, _ = input_img.shape
+            ph, pw = self.patch_size, self.patch_size
+            if h > ph and w > pw:
+                top = np.random.randint(0, h - ph)
+                left = np.random.randint(0, w - pw)
+                input_img = input_img[top:top+ph, left:left+pw]
+                target_img = target_img[top:top+ph, left:left+pw]
+            else:
+                input_img = cv2.resize(input_img, (pw, ph), interpolation=cv2.INTER_AREA)
+                target_img = cv2.resize(target_img, (pw, ph), interpolation=cv2.INTER_AREA)
+        # 转为float32并归一化到[0,1]
+        input_img = input_img.astype(np.float32) / 255.0
+        target_img = target_img.astype(np.float32) / 255.0
+        # HWC to CHW
+        input_img = np.transpose(input_img, (2, 0, 1))
+        target_img = np.transpose(target_img, (2, 0, 1))
+        return torch.Tensor(input_img), torch.Tensor(target_img)
 
-        target_path = os.path.join(self.data_path, 'train_target.h5')
-        input_path = os.path.join(self.data_path, 'train_input.h5')
+class DerainFullImageDataset(Dataset):
+    def __init__(self, data_path):
+        self.data_path = data_path
+        self.input_dir = os.path.join(self.data_path, 'rainy_image')
+        self.img_exts = ['.jpg', '.png', '.jpeg', '.bmp']
+        self.input_files = [f for f in os.listdir(self.input_dir) if any(f.lower().endswith(ext) for ext in self.img_exts)]
+        self.input_files.sort()
 
-        target_h5f = h5py.File(target_path, 'r')
-        input_h5f = h5py.File(input_path, 'r')
+    def __len__(self):
+        return len(self.input_files)
 
-        key = self.keys[index]
-        target = np.array(target_h5f[key])
-        input = np.array(input_h5f[key])
+    def __getitem__(self, idx):
+        img_name = self.input_files[idx]
+        img_path = os.path.join(self.input_dir, img_name)
+        img = cv2.imread(img_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = img.astype(np.float32) / 255.0
+        img = np.transpose(img, (2, 0, 1))
+        return torch.Tensor(img), img_name
 
-        target_h5f.close()
-        input_h5f.close()
+def train_dataloader(data_path, batch_size=16, num_workers=4, patch_size=256, use_patch=True):
+    dataset = DerainPatchDataset(data_path, patch_size=patch_size, use_patch=use_patch)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)
+    return loader
 
-        return torch.Tensor(input), torch.Tensor(target)
+def test_dataloader(data_path, batch_size=1, num_workers=0):
+    dataset = DerainFullImageDataset(data_path)
+    loader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers, pin_memory=True)
+    return loader

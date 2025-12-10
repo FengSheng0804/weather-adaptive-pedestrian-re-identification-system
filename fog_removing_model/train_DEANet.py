@@ -10,7 +10,7 @@ import random
 
 from logger.logger import plot_loss_log, plot_psnr_log
 from SSIM import psnr, ssim
-from fog_removing_model.model.backbone_train import DEANet
+from models.backbone_train import DEANet
 from loss.contrast_loss import ContrastLoss
 from data.data_loader import TrainDataset, TestDataset, ValDataset
 
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     set_seed_torch(42)
 
     train_dir = os.path.join(opt.data_dir, 'train')
-    full_dataset = TrainDataset(os.path.join(train_dir, 'foggy_image'), os.path.join(train_dir, 'ground_truth'))
+    full_dataset = TrainDataset(os.path.join(train_dir, 'foggy_image'), os.path.join(train_dir, 'ground_truth'), crop_size=256)
     
     # 划分训练集和验证集
     validation_split = 0.2

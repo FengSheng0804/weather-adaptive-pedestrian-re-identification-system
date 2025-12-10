@@ -5,31 +5,35 @@ import torch.nn.functional as F
 from data import train_dataloader
 from utils import Adder, Timer
 from valid import valid
-# from torch.utils.tensorboard import SummaryWriter
-from model.ConvIR import ConvIR
+from torch.utils.tensorboard import SummaryWriter
+from models.ConvIR import ConvIR
 from warmup_scheduler import GradualWarmupScheduler
+from pytorch_msssim import ssim
 
 
 parser = argparse.ArgumentParser()
 
 # Directories
 parser.add_argument('--data_dir', type=str, default='datasets/DesnowDataset')
+parser.add_argument('--model_save_dir', type=str, default='snow_removing_model/weights', help='path to save model files')
+parser.add_argument('--log_save_dir', type=str, default='snow_removing_model/results/logs', help='path to save result files')
 
 # Train
 parser.add_argument('--batch_size', type=int, default=8)
-parser.add_argument('--num_epoch', type=int, default=2000)
+parser.add_argument('--num_epoch', type=int, default=100)
 parser.add_argument('--learning_rate', type=float, default=2e-4)
 parser.add_argument('--weight_decay', type=float, default=0)
-parser.add_argument('--print_freq', type=int, default=100)
-parser.add_argument('--save_freq', type=int, default=50)
-parser.add_argument('--valid_freq', type=int, default=50)
+parser.add_argument('--print_freq', type=int, default=5)
+parser.add_argument('--save_freq', type=int, default=5)
+parser.add_argument('--valid_freq', type=int, default=5)
 parser.add_argument('--num_worker', type=int, default=8)
 parser.add_argument('--resume', type=str, default='')
 
 args = parser.parse_args()
-args.model_save_dir = os.path.join('snow_removing_model/results', 'training_results')
 if not os.path.exists(args.model_save_dir):
     os.makedirs(args.model_save_dir)
+if not os.path.exists(args.result_dir):
+    os.makedirs(args.result_dir)
 
 
 def train(model):
@@ -53,11 +57,13 @@ def train(model):
         epoch += 1
 
 
-    # writer = SummaryWriter()
+    writer = SummaryWriter(log_dir=args.result_dir)
     epoch_pixel_adder = Adder()
     epoch_fft_adder = Adder()
+    epoch_ssim_adder = Adder()
     iter_pixel_adder = Adder()
     iter_fft_adder = Adder()
+    iter_ssim_adder = Adder()
     epoch_timer = Timer('m')
     iter_timer = Timer('m')
     best_psnr=-1
@@ -109,6 +115,11 @@ def train(model):
             torch.nn.utils.clip_grad_norm_(model.parameters(), 0.01)
             optimizer.step()
 
+            # 计算SSIM
+            ssim_val = ssim(pred_img[2], label_img, data_range=1, size_average=True)
+            iter_ssim_adder(ssim_val.item())
+            epoch_ssim_adder(ssim_val.item())
+
             iter_pixel_adder(loss_content.item())
             iter_fft_adder(loss_fft.item())
 
@@ -116,15 +127,16 @@ def train(model):
             epoch_fft_adder(loss_fft.item())
 
             if (iter_idx + 1) % args.print_freq == 0:
-                print("Time: %7.4f Epoch: %03d Iter: %4d/%4d LR: %.10f Loss content: %7.4f Loss fft: %7.4f" % (
+                print("Time: %7.4f Epoch: %03d Iter: %4d/%4d LR: %.10f Loss content: %7.4f Loss fft: %7.4f SSIM: %.4f" % (
                     iter_timer.toc(), epoch_idx, iter_idx + 1, max_iter, scheduler.get_lr()[0], iter_pixel_adder.average(),
-                    iter_fft_adder.average()))
-                # writer.add_scalar('Pixel Loss', iter_pixel_adder.average(), iter_idx + (epoch_idx-1)* max_iter)
-                # writer.add_scalar('FFT Loss', iter_fft_adder.average(), iter_idx + (epoch_idx - 1) * max_iter)
-                
+                    iter_fft_adder.average(), iter_ssim_adder.average()))
+                writer.add_scalar('Pixel Loss', iter_pixel_adder.average(), iter_idx + (epoch_idx-1)* max_iter)
+                writer.add_scalar('FFT Loss', iter_fft_adder.average(), iter_idx + (epoch_idx - 1) * max_iter)
+                writer.add_scalar('SSIM', iter_ssim_adder.average(), iter_idx + (epoch_idx - 1) * max_iter)
                 iter_timer.tic()
                 iter_pixel_adder.reset()
                 iter_fft_adder.reset()
+                iter_ssim_adder.reset()
         overwrite_name = os.path.join(args.model_save_dir, 'model.pkl')
         torch.save({'model': model.state_dict(),
                     'optimizer': optimizer.state_dict(),
@@ -133,19 +145,25 @@ def train(model):
         if epoch_idx % args.save_freq == 0:
             save_name = os.path.join(args.model_save_dir, 'model_%d.pkl' % epoch_idx)
             torch.save({'model': model.state_dict()}, save_name)
-        print("EPOCH: %02d\nElapsed time: %4.2f Epoch Pixel Loss: %7.4f Epoch FFT Loss: %7.4f" % (
-            epoch_idx, epoch_timer.toc(), epoch_pixel_adder.average(), epoch_fft_adder.average()))
+        print("EPOCH: %02d\nElapsed time: %4.2f Epoch Pixel Loss: %7.4f Epoch FFT Loss: %7.4f Epoch SSIM: %.4f" % (
+            epoch_idx, epoch_timer.toc(), epoch_pixel_adder.average(), epoch_fft_adder.average(), epoch_ssim_adder.average()))
+        
         epoch_fft_adder.reset()
         epoch_pixel_adder.reset()
+        epoch_ssim_adder.reset()
         scheduler.step()
+        
         if epoch_idx % args.valid_freq == 0:
             val_snow = valid(model, epoch_idx)
             print('%03d epoch \n Average PSNR %.2f dB' % (epoch_idx, val_snow))
-            # writer.add_scalar('PSNR_Desnowing', val_snow, epoch_idx)
+            writer.add_scalar('PSNR_Desnowing', val_snow, epoch_idx)
+            
             if val_snow >= best_psnr:
+                best_psnr = val_snow
                 torch.save({'model': model.state_dict()}, os.path.join(args.model_save_dir, 'Best.pkl'))
     save_name = os.path.join(args.model_save_dir, 'Final.pkl')
     torch.save({'model': model.state_dict()}, save_name)
+    writer.close()
 
 if __name__ == '__main__':
     model = ConvIR()

@@ -14,26 +14,30 @@ import sys
 # Add the parent directory to the path to allow imports from sibling directories
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from fog_removing_model.model.backbone_train import DEANet
-from model.backbone import Backbone
+from models.backbone_train import DEANet
+from models.backbone import Backbone
 from utils import pad_img
 import argparse
 
 
 parser = argparse.ArgumentParser(description='DEANet Testing')
 parser.add_argument('--weights_path', type=str, 
-                    default='fog_removing_model\\weights\\best.pth',
+                    default='fog_removing_model\\weights\\best_after_reparam.pk',
                     help='Path to the trained weights file')
 parser.add_argument('--data_path', type=str, 
                     default='datasets\\DefogDataset\\test',
                     help='Path to the test data directory')
-parser.add_argument('--save_path', type=str, 
+parser.add_argument('--result_dir', type=str, 
                     default='fog_removing_model\\results',
                     help='Path to save the de-fogged images')
 parser.add_argument('--use_GPU', action='store_true', help='Use GPU for testing')
 parser.add_argument('--gpu_id', type=str, default="0", help='GPU ID to use')
 
 opt = parser.parse_args()
+opt.predict_result_dir = os.path.join(opt.result_dir, 'predict')
+if not os.path.exists(opt.predict_result_dir):
+    os.makedirs(opt.predict_result_dir)
+
 # The original logic was to use GPU if available. We can replicate that.
 if not opt.use_GPU:
     opt.use_GPU = torch.cuda.is_available()
@@ -49,7 +53,7 @@ def test():
     if opt.use_GPU:
         os.environ["CUDA_VISIBLE_DEVICES"] = opt.gpu_id
 
-    os.makedirs(opt.save_path, exist_ok=True)
+    os.makedirs(opt.predict_result_dir, exist_ok=True)
 
     # Build model
     print('Loading model ...\n')
@@ -112,12 +116,12 @@ def test():
 
             # print(img_name, ': ', dur_time)
 
-        save_path = os.path.join(opt.save_path, img_name)
-        save_image(output, save_path)
+        result_path = os.path.join(opt.predict_result_dir, img_name)
+        save_image(output, result_path)
 
         count += 1
 
-    print(f'\nTesting finished. Results saved to {opt.save_path}')
+    print(f'\nTesting finished. Results saved to {opt.predict_result_dir}')
     if count > 0:
         print(f'Avg. time: {time_test/count:.4f} seconds')
 

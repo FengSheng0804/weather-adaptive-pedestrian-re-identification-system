@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+import os
 
 def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8), use_depth_map=False, depth_map=None):
     """
@@ -52,34 +53,70 @@ def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8)
     # 扩展透射率到三通道（如果是彩色图像）
     if chs == 3:
         t = t[:, :, np.newaxis]
-    
+
     # 大气散射模型: I = J * t + A * (1 - t)
     # 其中 I 是加雾后的图像，J 是原始图像，t 是透射率，A 是大气光值
-    fogged_img = img_f * t + np.random.uniform(brightness_range[0], brightness_range[1]) * (1 - t)
-    
-    # 确保值在有效范围内并转换回uint8
+    brightness = np.random.uniform(brightness_range[0], brightness_range[1])
+    fogged_img = img_f * t + brightness * (1 - t)
     fogged_img = np.clip(fogged_img * 255, 0, 255).astype(np.uint8)
-    
-    return fogged_img
+
+    # 量化指标
+    beta_val = float(-beta)
+    brightness_val = float(brightness)
+
+    # 归一化（区间可根据实际数据调整）
+    beta_norm = (beta_val - 0.01) / (0.08 - 0.01)  # beta_range
+    brightness_norm = (brightness_val - 0.6) / (0.8 - 0.6)  # brightness_range
+    # 越大雾越重：beta↑, brightness↓
+    brightness_score = 1 - np.clip(brightness_norm, 0, 1)
+    beta_score = np.clip(beta_norm, 0, 1)
+    # 综合分数
+    fog_score = float(beta_score * 0.9 + brightness_score * 0.1)
+
+    return fogged_img, fog_score
 
 if __name__ == "__main__":
-    # 读取原始图像
-    original_path = "ground_truth.png"  # 请替换为您的图像路径
-    original_img = cv2.imread(original_path)
-    
-    if original_img is None:
-        print("错误：无法读取图像，请检查路径！")
-        exit()
-    
-    fog_result = add_fog(
-        original_image=original_img,
-        beta_range=(0, 0.08),
-        brightness_range=(0.6, 0.8)
-    )
-    
-    # 保存结果
-    cv2.imwrite("fog_result.jpg", fog_result)
-    
-    cv2.imshow("Foggy_image", fog_result)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input_dir', type=str, default=r'datasets/DefogDataset/train/ground_truth', help='输入图片文件夹')
+    parser.add_argument('--output_dir', type=str, default=r'datasets/DefogDataset/train/foggy_image', help='输出图片文件夹')
+    parser.add_argument('--num', type=int, default=5, help='每张图片生成的加雾效果数量')
+    args = parser.parse_args()
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    for fname in os.listdir(args.input_dir):
+        if fname.lower().endswith('.jpg'):
+            img_path = os.path.join(args.input_dir, fname)
+            img = cv2.imread(img_path)
+            for i in range(1, args.num + 1):
+                fog_img = add_fog(
+                    original_image=img,
+                    beta_range=(0, 0.08),
+                    brightness_range=(0.6, 0.8)
+                )
+                out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
+                out_path = os.path.join(args.output_dir, out_name)
+                cv2.imwrite(out_path, fog_img)
+                print(f"已保存: {out_path}")
+
+
+    # # 测试分数代码
+    # input_dir = r'datasets/DefogDataset/train/ground_truth'
+    # output_dir = r'datasets/DefogDataset/foggy_image'
+    # num = 5
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # for fname in os.listdir(input_dir):
+    #     if fname.lower().endswith('.jpg'):
+    #         img_path = os.path.join(input_dir, fname)
+    #         img = cv2.imread(img_path)
+    #         for i in range(1, num + 1):
+    #             fog_img, fog_score = add_fog(
+    #                 original_image=img,
+    #                 beta_range=(0.01, 0.08),
+    #                 brightness_range=(0.6, 0.8)
+    #             )
+    #             out_path = os.path.join(output_dir, f"{fog_score:.4f}_" + fname)
+    #             cv2.imwrite(out_path, fog_img)
