@@ -53,15 +53,27 @@ def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8)
     # 扩展透射率到三通道（如果是彩色图像）
     if chs == 3:
         t = t[:, :, np.newaxis]
-    
+
     # 大气散射模型: I = J * t + A * (1 - t)
     # 其中 I 是加雾后的图像，J 是原始图像，t 是透射率，A 是大气光值
-    fogged_img = img_f * t + np.random.uniform(brightness_range[0], brightness_range[1]) * (1 - t)
-    
-    # 确保值在有效范围内并转换回uint8
+    brightness = np.random.uniform(brightness_range[0], brightness_range[1])
+    fogged_img = img_f * t + brightness * (1 - t)
     fogged_img = np.clip(fogged_img * 255, 0, 255).astype(np.uint8)
-    
-    return fogged_img
+
+    # 量化指标
+    beta_val = float(-beta)
+    brightness_val = float(brightness)
+
+    # 归一化（区间可根据实际数据调整）
+    beta_norm = (beta_val - 0.01) / (0.08 - 0.01)  # beta_range
+    brightness_norm = (brightness_val - 0.6) / (0.8 - 0.6)  # brightness_range
+    # 越大雾越重：beta↑, brightness↓
+    brightness_score = 1 - np.clip(brightness_norm, 0, 1)
+    beta_score = np.clip(beta_norm, 0, 1)
+    # 综合分数
+    fog_score = float(beta_score * 0.9 + brightness_score * 0.1)
+
+    return fogged_img, fog_score
 
 if __name__ == "__main__":
     import argparse
@@ -88,3 +100,23 @@ if __name__ == "__main__":
                 out_path = os.path.join(args.output_dir, out_name)
                 cv2.imwrite(out_path, fog_img)
                 print(f"已保存: {out_path}")
+
+
+    # # 测试分数代码
+    # input_dir = r'datasets/DefogDataset/train/ground_truth'
+    # output_dir = r'datasets/DefogDataset/foggy_image'
+    # num = 5
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # for fname in os.listdir(input_dir):
+    #     if fname.lower().endswith('.jpg'):
+    #         img_path = os.path.join(input_dir, fname)
+    #         img = cv2.imread(img_path)
+    #         for i in range(1, num + 1):
+    #             fog_img, fog_score = add_fog(
+    #                 original_image=img,
+    #                 beta_range=(0.01, 0.08),
+    #                 brightness_range=(0.6, 0.8)
+    #             )
+    #             out_path = os.path.join(output_dir, f"{fog_score:.4f}_" + fname)
+    #             cv2.imwrite(out_path, fog_img)

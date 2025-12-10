@@ -51,7 +51,7 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
     
     # 随机生成雨线数量
     rain_count = random.randint(*rain_count_range)
-    
+
     for _ in range(rain_count):
         # 随机生成雨线起点（允许从图像上方外部开始），要尽可能均匀分布
         x1 = random.randint(0, w)
@@ -71,8 +71,6 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
         
         # 随机雨线宽度
         width = random.randint(*rain_width_range)
-        
-        # 使用更亮的雨滴颜色
         rain_color_adjusted = (
             min(255, int(rain_color[0] * rain_brightness / 255)),
             min(255, int(rain_color[1] * rain_brightness / 255)),
@@ -111,8 +109,17 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
         rainy_img_float[:, :, c] = result * 255.0
     
     rainy_img = np.clip(rainy_img_float, 0, 255).astype(np.uint8)
-    
-    return rainy_img
+
+    # 计算图像背景亮度均值
+    gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # 量化指标融合为雨强度分数
+    background_brightness_score = (1 - (np.mean(gray_img) - 50.0) / (225.0 - 50.0))
+    rain_count_score = np.clip((rain_count - 20) / (600.0 - 20.0), 0, 1)
+    blur_length_score = np.clip((blur_length - 3.0) / (5.0 - 3.0), 0, 1)
+    rain_alpha_score = 1 - np.clip((rain_alpha - 0.3) / (0.6 - 0.3), 0, 1)
+    rain_score = float(rain_count_score * 0.8 + background_brightness_score * 0.05 + blur_length_score * 0.1 + rain_alpha_score * 0.05)
+    return rainy_img, rain_score
 
 
 if __name__ == "__main__":
@@ -133,10 +140,10 @@ if __name__ == "__main__":
             for i in range(1, args.num + 1):
                 rain_img = add_rain(
                     original_image=img,                             # 原始图像
-                    rain_count_range=(100, 800),                    # 适当减少雨线数量，避免过度密集
+                    rain_count_range=(20, 600),                     # 适当减少雨线数量，避免过度密集
                     rain_length_range=(8, 30),                      # 中等长度雨线
                     rain_width_range=(1, 1),                        # 细雨线
-                    rain_alpha_range=(0.3, 0.6),                    # 提高透明度，使雨滴更明显但不发黑
+                    rain_alpha_range=(0.3, 0.5),                    # 提高透明度，使雨滴更明显但不发黑
                     blur_angle_range=(70, 110),                     # 雨滴倾斜角度
                     blur_length_range=(3, 5),                       # 适中的运动模糊
                     rain_brightness=240,                            # 提高雨滴亮度
@@ -146,3 +153,29 @@ if __name__ == "__main__":
                 out_path = os.path.join(args.output_dir, out_name)
                 cv2.imwrite(out_path, rain_img)
                 print(f"已保存: {out_path}")
+
+
+    # # 测试分数代码
+    # input_dir = r'datasets\DerainDataset\train\ground_truth'
+    # output_dir = r'datasets\DerainDataset\rainy_image'
+    # num = 5
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # for fname in os.listdir(input_dir):
+    #     if fname.lower().endswith(('.jpg')):
+    #         img_path = os.path.join(input_dir, fname)
+    #         img = cv2.imread(img_path)
+    #         for i in range(1, num + 1):
+    #             rain_img, rain_score = add_rain(
+    #                 original_image=img,
+    #                 rain_count_range=(20, 600),
+    #                 rain_length_range=(8, 30),
+    #                 rain_width_range=(1, 1),
+    #                 rain_alpha_range=(0.3, 0.5),
+    #                 blur_angle_range=(70, 110),
+    #                 blur_length_range=(3, 5),
+    #                 rain_brightness=240,
+    #                 rain_color=(255, 255, 255)
+    #             )
+    #             out_path = os.path.join(output_dir, f"{rain_score:.4f}_" + fname)
+    #             cv2.imwrite(out_path, rain_img)

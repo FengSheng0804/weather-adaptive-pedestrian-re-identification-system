@@ -140,3 +140,5 @@ python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --te
 
 1. 在使用PReNet进行预测的时候，由于尺寸的问题，需要对图像进行resize操作，但是如果使用resize操作，会导致经过预测后的图像产生锯齿。
    1. 解决办法：使用分块训练的方法。
+
+2. MoE架构的数据集如何生成？
