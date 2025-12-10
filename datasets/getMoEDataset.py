@@ -94,7 +94,7 @@ def process_fog(single=2000, double=500, triple=300):
             rain_brightness=240,
             rain_color=(255, 255, 255)
         )
-        fog_rain_scores.append(f"fog:{fog_score:.2f}, rain:{rain_score:.2f}")
+        fog_rain_scores.append(f"fog:{fog_score:.2f},rain:{rain_score:.2f}")
 
         dst_path = os.path.join(fog_rain_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(fog_rain_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -129,7 +129,7 @@ def process_fog(single=2000, double=500, triple=300):
             blur_angle_variance=20,
             snow_intensity=0.8
         )
-        fog_snow_scores.append(f"fog:{fog_score:.2f}, snow:{snow_score:.2f}")
+        fog_snow_scores.append(f"fog:{fog_score:.2f},snow:{snow_score:.2f}")
 
         dst_path = os.path.join(fog_snow_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(fog_snow_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -175,7 +175,7 @@ def process_fog(single=2000, double=500, triple=300):
             blur_angle_variance=20,
             snow_intensity=0.8
         )
-        fog_rain_snow_scores.append(f"fog:{fog_score:.2f}, rain:{rain_score:.2f}, snow:{snow_score:.2f}")
+        fog_rain_snow_scores.append(f"fog:{fog_score:.2f},rain:{rain_score:.2f},snow:{snow_score:.2f}")
 
         dst_path = os.path.join(fog_rain_snow_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(fog_rain_snow_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -270,7 +270,7 @@ def process_rain(single=2000, double=500, triple=300):
             beta_range=(0.01, 0.08),
             brightness_range=(0.6, 0.8)
         )
-        rain_fog_scores.append(f"rain:{rain_score:.2f}, fog:{fog_score:.2f}")
+        rain_fog_scores.append(f"rain:{rain_score:.2f},fog:{fog_score:.2f}")
 
         dst_path = os.path.join(rain_fog_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(rain_fog_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -311,7 +311,7 @@ def process_rain(single=2000, double=500, triple=300):
             blur_angle_variance=20,
             snow_intensity=0.8
         )
-        rain_snow_scores.append(f"rain:{rain_score:.2f}, snow:{snow_score:.2f}")
+        rain_snow_scores.append(f"rain:{rain_score:.2f},snow:{snow_score:.2f}")
 
         dst_path = os.path.join(rain_snow_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(rain_snow_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -356,7 +356,7 @@ def process_rain(single=2000, double=500, triple=300):
             blur_angle_variance=20,
             snow_intensity=0.8
         )
-        rain_fog_snow_scores.append(f"rain:{rain_score:.2f}, fog:{fog_score:.2f}, snow:{snow_score:.2f}")
+        rain_fog_snow_scores.append(f"rain:{rain_score:.2f},fog:{fog_score:.2f},snow:{snow_score:.2f}")
 
         dst_path = os.path.join(rain_fog_snow_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(rain_fog_snow_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -448,7 +448,7 @@ def process_snow(single=2000, double=500, triple=300):
             beta_range=(0.01, 0.08),
             brightness_range=(0.6, 0.8)
         )
-        snow_fog_scores.append(f"snow:{snow_score:.2f}, fog:{fog_score:.2f}")
+        snow_fog_scores.append(f"snow:{snow_score:.2f},fog:{fog_score:.2f}")
 
         dst_path = os.path.join(snow_fog_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(snow_fog_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -489,7 +489,7 @@ def process_snow(single=2000, double=500, triple=300):
             rain_brightness=240,
             rain_color=(255, 255, 255)
         )
-        snow_rain_scores.append(f"snow:{snow_score:.2f}, rain:{rain_score:.2f}")
+        snow_rain_scores.append(f"snow:{snow_score:.2f},rain:{rain_score:.2f}")
 
         dst_path = os.path.join(snow_rain_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(snow_rain_ground_truth_dir, f"{idx+1+start_index}.jpg")
@@ -535,7 +535,7 @@ def process_snow(single=2000, double=500, triple=300):
             rain_brightness=240,
             rain_color=(255, 255, 255)
         )
-        snow_fog_rain_scores.append(f"snow:{snow_score:.2f}, fog:{fog_score:.2f}, rain:{rain_score:.2f}")
+        snow_fog_rain_scores.append(f"snow:{snow_score:.2f},fog:{fog_score:.2f},rain:{rain_score:.2f}")
         dst_path = os.path.join(snow_fog_rain_dir, f"{idx+1+start_index}.jpg")
         gt_dst_path = os.path.join(snow_fog_rain_ground_truth_dir, f"{idx+1+start_index}.jpg")
         cv2.imwrite(dst_path, snow_fog_rain_img)

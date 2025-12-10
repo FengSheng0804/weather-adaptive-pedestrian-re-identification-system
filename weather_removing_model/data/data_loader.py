@@ -1,6 +1,50 @@
 import os
+import random
 from torch.utils.data import Dataset
 from PIL import Image
+from torchvision.transforms.functional import rotate, crop
+from torchvision.transforms import ToTensor, RandomCrop
+
+def is_image_file(filename):
+    return any(filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.bmp'])
+
+class singleDataset(Dataset):
+    def __init__(self, root_dir, weather_class, crop_size=256):
+        # root_dir: MoEDataset根目录
+        super(singleDataset, self).__init__()
+        self.weather_path = os.path.join(root_dir, '1', weather_class)
+        self.ground_truth_path = os.path.join(root_dir, '1', weather_class + '_ground_truth')
+        self.weather_image_list = [f for f in os.listdir(self.weather_path) if is_image_file(f)]
+        self.weather_image_list.sort()
+        self.crop_size = crop_size
+
+    def __getitem__(self, index):
+        weather_image_name = self.weather_image_list[index]
+        ground_truth_name = weather_image_name  # 名字相同
+        
+        weather_image_path = os.path.join(self.weather_path, weather_image_name)
+        ground_truth_image_path = os.path.join(self.ground_truth_path, ground_truth_name)
+        
+        weather_image = Image.open(weather_image_path).convert('RGB')
+        ground_truth_image = Image.open(ground_truth_image_path).convert('RGB')
+
+        # 采用随机裁剪和旋转增强
+        crop_params = RandomCrop.get_params(weather_image, [self.crop_size, self.crop_size])
+        rotate_params = random.randint(0, 3) * 90
+        # 随机裁剪
+        weather_image = crop(weather_image, *crop_params)
+        ground_truth_image = crop(ground_truth_image, *crop_params)
+        # 随机旋转
+        weather_image = rotate(weather_image, rotate_params)
+        ground_truth_image = rotate(ground_truth_image, rotate_params)
+        to_tensor = ToTensor()
+        weather_image = to_tensor(weather_image)
+        ground_truth_image = to_tensor(ground_truth_image)
+        return weather_image, ground_truth_image
+
+    def __len__(self):
+        return len(self.weather_image_list)
+
 
 def default_loader(path):
     return Image.open(path).convert('RGB')
@@ -47,7 +91,13 @@ class MoEDataset(Dataset):
             scores = []
             if os.path.exists(score_path):
                 with open(score_path, 'r') as f:
-                    scores = [line.strip() for line in f.readlines()]
+                    # 每行可能有多个分数，全部处理成字典的形式
+                    for line in f:
+                        parts = line.strip().split(',')
+                        if len(parts) > 1:
+                            scores.append({parts[i].split(':')[0]: float(parts[i].split(':')[1]) for i in range(len(parts))})
+                        else:
+                            scores.append({parts[0].split(':')[0]: float(parts[0].split(':')[1])})
             # 匹配图片
             img_files = sorted([f for f in os.listdir(input_dir) if f.lower().endswith(('.jpg', '.png'))])
             for i, img_name in enumerate(img_files):
@@ -59,8 +109,8 @@ class MoEDataset(Dataset):
     def __len__(self):
         return len(self.samples)
 
-    def __getitem__(self, idx):
-        input_path, gt_path, label, score = self.samples[idx]
+    def __getitem__(self, index):
+        input_path, gt_path, label, score = self.samples[index]
         input_img = self.loader(input_path)
         gt_img = self.loader(gt_path)
         if self.transform:
