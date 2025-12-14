@@ -24,7 +24,7 @@ def motion_blur_kernel(length, angle):
 
 def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(15, 35), 
              rain_width_range=(1, 2), rain_alpha_range=(0.2, 0.6), blur_angle_range=(45, 135), blur_length_range=(10, 20),
-             rain_brightness=220, rain_color=(255, 255, 255)):
+             rain_brightness=220, rain_color=(255, 255, 255), return_mask=False):
     """
     给图像添加雨效果（修复雨滴发黑问题）
     :param original_image: 原始图像（BGR格式）
@@ -90,9 +90,9 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
     rain_alpha = random.uniform(*rain_alpha_range)
     
     # 创建雨滴掩码
-    rain_mask = cv2.cvtColor(rain_layer, cv2.COLOR_BGR2GRAY)
-    _, rain_mask = cv2.threshold(rain_mask, 10, 255, cv2.THRESH_BINARY)
-    rain_mask = rain_mask.astype(np.float32) / 255.0
+    rain_mask_gray = cv2.cvtColor(rain_layer, cv2.COLOR_BGR2GRAY)
+    _, rain_mask_bin = cv2.threshold(rain_mask_gray, 10, 255, cv2.THRESH_BINARY)
+    rain_mask = rain_mask_bin.astype(np.float32) / 255.0
     
     # 将原图转换为浮点数以便计算
     img_float = img.astype(np.float32)
@@ -119,6 +119,10 @@ def add_rain(original_image, rain_count_range=(2000, 3000), rain_length_range=(1
     blur_length_score = np.clip((blur_length - 3.0) / (5.0 - 3.0), 0, 1)
     rain_alpha_score = 1 - np.clip((rain_alpha - 0.3) / (0.6 - 0.3), 0, 1)
     rain_score = float(rain_count_score * 0.8 + background_brightness_score * 0.05 + blur_length_score * 0.1 + rain_alpha_score * 0.05)
+    if return_mask:
+        # 返回mask
+        rain_mask_uint8 = (rain_mask * 255).astype(np.uint8)
+        return rainy_img, rain_score, rain_mask_uint8
     return rainy_img, rain_score
 
 
@@ -179,3 +183,27 @@ if __name__ == "__main__":
     #             )
     #             out_path = os.path.join(output_dir, f"{rain_score:.4f}_" + fname)
     #             cv2.imwrite(out_path, rain_img)
+
+    # # 测试带掩码的加雨
+    # input_dir = r'datasets\DerainDataset\train\ground_truth'
+    # output_dir = r'datasets\DerainDataset\train\rain_mask'
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # for fname in os.listdir(input_dir):
+    #     if fname.lower().endswith(('.jpg')):
+    #         img_path = os.path.join(input_dir, fname)
+    #         img = cv2.imread(img_path)
+    #         rain_img, rain_score, rain_mask = add_rain(
+    #             original_image=img,
+    #             rain_count_range=(20, 600),
+    #             rain_length_range=(8, 30),
+    #             rain_width_range=(1, 1),
+    #             rain_alpha_range=(0.3, 0.5),
+    #             blur_angle_range=(70, 110),
+    #             blur_length_range=(3, 5),
+    #             rain_brightness=240,
+    #             rain_color=(255, 255, 255),
+    #             return_mask=True
+    #         )
+    #         out_path = os.path.join(output_dir, f"{rain_score:.4f}_" + fname)
+    #         cv2.imwrite(out_path, rain_mask)

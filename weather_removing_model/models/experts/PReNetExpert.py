@@ -87,11 +87,11 @@ class PReNetExpert(nn.Module):
             x = self.conv0(x)
 
             x = torch.cat((x, h), 1)
-            i = self.conv_i(x)
+            ii = self.conv_i(x)
             f = self.conv_f(x)
             g = self.conv_g(x)
             o = self.conv_o(x)
-            c = f * c + i * g
+            c = f * c + ii * g
             h = o * torch.tanh(c)
 
             x = h
