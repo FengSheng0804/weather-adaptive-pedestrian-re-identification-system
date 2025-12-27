@@ -722,6 +722,6 @@ if __name__ == "__main__":
     process_rain(single=2000, double=500, triple=300, mode='train')
     process_snow(single=2000, double=500, triple=300, mode='train')
 
-    # process_fog(single=50, double=50, triple=50, mode='test')
-    # process_rain(single=50, double=50, triple=50, mode='test')
-    # process_snow(single=50, double=50, triple=50, mode='test')
+    process_fog(single=20, double=20, triple=20, mode='test')
+    process_rain(single=20, double=20, triple=20, mode='test')
+    process_snow(single=20, double=20, triple=20, mode='test')

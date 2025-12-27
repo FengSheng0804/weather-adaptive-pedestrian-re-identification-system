@@ -81,7 +81,7 @@ def train_worker(local_rank, args):
             model = torch.nn.DataParallel(model)
 
     # Param groups: separate experts vs gate/fusion/reconstruction
-    main_params = []  # gate, fusion, reconstruction, residual
+    main_params = []  # gate, fusion, reconstruction
     expert_pretrained_params = []  # derain/defog/desnow pretrained parts
     expert_newlayer_params = []    # newly added layers (e.g., feature_extractor, moe_adapter)
     # 对于多卡，需要访问 module 属性
@@ -89,7 +89,7 @@ def train_worker(local_rank, args):
     main_params += list(m.moe_gate.parameters())
     main_params += list(m.feature_fusion.parameters())
     main_params += list(m.reconstruction_net.parameters())
-    main_params += list(m.residual_conv.parameters())
+    # residual_conv 已移除
 
     def split_expert_params(expert, new_prefixes=("feature_extractor", "moe_adapter")):
         pretrained, newlayers = [], []
@@ -136,6 +136,7 @@ def train_worker(local_rank, args):
 
     global_step = 0
     best_psnr = 0.0
+    patience_counter = 0
 
     os.makedirs(args.save_dir, exist_ok=True)
 
@@ -228,13 +229,12 @@ def train_worker(local_rank, args):
             else:
                 score_tensor = torch.tensor(scores, dtype=inputs.dtype, device=inputs.device).view(-1, 3)
 
-            # mask softmax归一化，保证0分项权重为0，其余归一化
+            # 准备门控对齐的目标：二值化，存在即为1
+            gate_target = None
             if score_tensor is not None:
-                mask = (score_tensor > 0).float()
-                masked_score = score_tensor * mask + (1 - mask) * -1e9
-                score_tensor = F.softmax(masked_score, dim=1) * mask
-                score_sum = score_tensor.sum(dim=1, keepdim=True) + 1e-8
-                score_tensor = score_tensor / score_sum
+                gate_target = (score_tensor > 0).float()
+                # 注意：不再对score_tensor进行Softmax归一化，因为我们改用了Sigmoid独立门控
+                # score_tensor保持原值传入模型作为条件输入
 
             optimizer.zero_grad()
             outputs = model(inputs, score=score_tensor)
@@ -283,45 +283,41 @@ def train_worker(local_rank, args):
             ssim_val = 1 - ssim(final_out, targets)
             # 对比损失，使用输出、GT、输入
             contrast = contrast_loss(final_out, targets, inputs)
-            base_loss = (0.8 * l1 * sample_weights).mean() + 0.15 * ssim_val + 0.05 * contrast
+            
+            # 增加对MoE中间输出的监督，确保残差融合逻辑生效
+            # 这能强迫专家网络和门控网络输出正确的"Clean Estimate"
+            moe_out = outputs.get('moe_output', None)
+            moe_l1 = 0.0
+            if moe_out is not None:
+                moe_l1 = l1_loss(moe_out, targets)
 
-            # 负载均衡：对门控权重添加正则，避免单专家主导
-            # 1) 每样本熵正则，鼓励分布更均匀
+            base_loss = (0.8 * l1 * sample_weights).mean() + 0.15 * ssim_val + 0.05 * contrast + 0.2 * moe_l1
+
+            # 负载均衡与对齐损失 (适配Sigmoid门控)
             gate_flat = gate_weights
             if gate_flat.dim() > 2:
                 gate_flat = gate_flat.view(gate_flat.size(0), -1)  # [B, num_experts]
-            eps = 1e-8
-            gate_entropy = - (gate_flat * (gate_flat + eps).log()).sum(dim=1).mean()
-
-            # 2) 批次均值与均匀分布的KL，鼓励整体负载均衡
-            avg_w = gate_flat.mean(dim=0)  # [num_experts]
-            uniform = torch.full_like(avg_w, 1.0 / avg_w.numel())
-            kl_uniform = (avg_w * (avg_w + eps).log() - avg_w * (uniform + eps).log()).sum()
-
-            # 门控与score对齐损失（KL散度）
+            
             align_loss = 0.0
-            # 这里使用到的score_tensor是归一化后的
-            if score_tensor is not None:
-                # KL(gate_weights || score_tensor)
-                # 归一化，避免0导致log(0)
-                gate_prob = gate_flat / (gate_flat.sum(dim=1, keepdim=True) + eps)
-                score_prob = score_tensor / (score_tensor.sum(dim=1, keepdim=True) + eps)
-                # 避免log(0)，加eps
-                kl_align = (gate_prob * (gate_prob.add(eps).log() - score_prob.add(eps).log())).sum(dim=1).mean()
-                align_loss = kl_align
-                # 可选：feature_weights 也加对齐损失
+            if gate_target is not None:
+                # 使用MSE让门控输出逼近二值目标 (0或1)
+                # 这直接解决了专家权重异常高或低的问题，强制其符合天气标签
+                align_loss = F.mse_loss(gate_flat, gate_target)
+                
                 if feature_weights is not None:
                     feat_flat = feature_weights
                     if feat_flat.dim() > 2:
                         feat_flat = feat_flat.view(feat_flat.size(0), -1)
-                    feat_prob = feat_flat / (feat_flat.sum(dim=1, keepdim=True) + eps)
-                    kl_feat = (feat_prob * (feat_prob.add(eps).log() - score_prob.add(eps).log())).sum(dim=1).mean()
-                    align_loss = align_loss + kl_feat
+                    align_loss = align_loss + F.mse_loss(feat_flat, gate_target)
 
-            # 合成负载均衡正则+对齐损失
-            lb_loss = - args.gate_entropy_coef * gate_entropy + args.gate_balance_coef * kl_uniform
-            align_coef = getattr(args, 'gate_align_coef', 1e-2)  # 可通过命令行调整
-            loss = base_loss + lb_loss + align_coef * align_loss
+            # 对于Sigmoid门控，传统的Softmax熵正则不再适用，且有强监督信号，故移除无监督正则
+            lb_loss = 0.0
+            
+            # 调整对齐系数，MSE通常较小，建议增大权重
+            align_coef = getattr(args, 'gate_align_coef', 1.0) 
+            # 如果命令行传入的是默认的小值(如1e-2)，这里可能需要放大，但为了尊重参数，我们假设用户会调整
+            # 或者我们可以给一个较大的默认倍数
+            loss = base_loss + align_coef * align_loss
             
             # backpropagation
             loss.backward()
@@ -351,26 +347,6 @@ def train_worker(local_rank, args):
                     writer.add_scalar('train/lr_main', optimizer.param_groups[0]['lr'], global_step)
                     if len(optimizer.param_groups) > 1:
                         writer.add_scalar('train/lr_experts', optimizer.param_groups[1]['lr'], global_step)
-
-            if is_master and global_step % 200 == 0 and score_tensor is not None:
-                gw = gate_weights
-                if gw.dim() > 2:
-                    gw = gw.view(gw.size(0), -1)
-                st = score_tensor
-                gw_np = gw.detach().cpu().numpy()
-                st_np = st.detach().cpu().numpy()
-                for i, name in enumerate(['fog', 'rain', 'snow']):
-                    plt.figure()
-                    plt.scatter(st_np[:, i], gw_np[:, i], alpha=0.5)
-                    plt.xlabel(f'{name} score')
-                    plt.ylabel(f'gate weight {name}')
-                    plt.title(f'Scatter: {name} score vs gate weight')
-                    plt.savefig(f'gate_vs_score_{name}_{global_step}.png')
-                    plt.close()
-                # 计算相关系数
-                corr = np.corrcoef(st_np.T, gw_np.T)[:3, 3:]
-                print(f'[Corr] step {global_step}:\n', corr)
-
 
             # Image visualization at lower frequency
             if is_master and writer is not None and hasattr(args, 'vis_interval') and global_step % args.vis_interval == 0:
@@ -429,15 +405,32 @@ def train_worker(local_rank, args):
             writer.add_images('eval/input', sample_inputs[:n_eval].detach().clamp(0, 1), epoch)
             writer.add_images('eval/output', eval_out[:n_eval].detach().clamp(0, 1), epoch)
             writer.add_images('eval/target', sample_targets[:n_eval].detach().clamp(0, 1), epoch)
-        if is_master and eval_psnr > best_psnr:
-            best_psnr = eval_psnr
-            save_path = os.path.join(args.save_dir, 'moe_best.pth')
-            to_save = (model.module.state_dict() if hasattr(model, 'module') else model.state_dict())
-            torch.save({'model': to_save, 'psnr': best_psnr, 'epoch': epoch}, save_path)
-            print(f"[SAVE] epoch {epoch} psnr {best_psnr:.2f} -> {save_path}")
+        # Early stopping logic
+        stop_flag = torch.tensor(0.0).to(device)
+        if is_master:
+            if eval_psnr > best_psnr:
+                best_psnr = eval_psnr
+                patience_counter = 0
+                save_path = os.path.join(args.save_dir, 'moe_best.pth')
+                to_save = (model.module.state_dict() if hasattr(model, 'module') else model.state_dict())
+                torch.save({'model': to_save, 'psnr': best_psnr, 'epoch': epoch}, save_path)
+                print(f"[SAVE] epoch {epoch} psnr {best_psnr:.2f} -> {save_path}")
+            else:
+                patience_counter += 1
+                print(f"[INFO] epoch {epoch} psnr {eval_psnr:.2f} (best {best_psnr:.2f}), patience {patience_counter}/{args.patience}")
+                if patience_counter >= args.patience:
+                    print(f"[STOP] Early stopping triggered after {args.patience} epochs without improvement.")
+                    stop_flag += 1.0
+
         # Log epoch-level eval metric
         if is_master and writer is not None:
             writer.add_scalar('eval/psnr', eval_psnr, epoch)
+
+        if args.distributed:
+            dist.all_reduce(stop_flag, op=dist.ReduceOp.SUM)
+        
+        if stop_flag.item() > 0:
+            break
 
         # optional periodic save
         if is_master and epoch % args.save_interval == 0:
@@ -468,7 +461,7 @@ def main():
     parser.add_argument('--class_num', type=int, default=3, help='number of weather types/classes')
     parser.add_argument('--batch_size', type=int, default=4)
     parser.add_argument('--num_workers', type=int, default=4, help='number of data loading workers')
-    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--epochs', type=int, default=10)
     # Learning rates
     parser.add_argument('--main_lr', type=float, default=1e-4, help='LR for gate/fusion/reconstruction')
     parser.add_argument('--experts_lr', type=float, default=1e-5, help='LR for experts during finetune')
@@ -476,7 +469,7 @@ def main():
     parser.add_argument('--gate_entropy_coef', type=float, default=5e-2, help='coef for gate entropy regularization')
     parser.add_argument('--gate_balance_coef', type=float, default=5e-2, help='coef for batch-level uniform KL')
     # Freeze-then-unfreeze config
-    parser.add_argument('--freeze_experts_epochs', type=int, default=5, help='Freeze experts for N initial epochs')
+    parser.add_argument('--freeze_experts_epochs', type=int, default=2, help='Freeze experts for N initial epochs')
     parser.add_argument('--log_interval', type=int, default=50)
     parser.add_argument('--vis_interval', type=int, default=200, help='steps between image visualizations')
     parser.add_argument('--vis_count', type=int, default=5, help='number of images to visualize per write')
@@ -492,7 +485,9 @@ def main():
     parser.add_argument('--dist_backend', type=str, default='nccl', help='DDP backend (nccl for CUDA)')
     parser.add_argument('--dist_url', type=str, default='tcp://127.0.0.1:29500', help='Init method URL for DDP')
     # 新增门控对齐损失系数参数
-    parser.add_argument('--gate_align_coef', type=float, default=1e-2, help='coef for gate-score alignment loss (KL)')
+    parser.add_argument('--gate_align_coef', type=float, default=1.0, help='coef for gate-score alignment loss (MSE)')
+    # 早停参数
+    parser.add_argument('--patience', type=int, default=3, help='Early stopping patience epochs')
     args = parser.parse_args()
 
     if args.distributed:
