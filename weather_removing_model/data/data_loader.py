@@ -124,7 +124,7 @@ class MoETestDataset(Dataset):
         else:
             self.transform = None
         self.loader = loader
-        self.samples = []  # (input_path, gt_path, img_name, score)
+        self.samples = []  # (input_path, gt_path, img_name)
 
         input_dir = os.path.join(root_dir, "test", "weather_image")
         gt_dir = os.path.join(root_dir, "test", "ground_truth")
@@ -153,18 +153,14 @@ class MoETestDataset(Dataset):
         for i, img_name in enumerate(img_files):
             input_path = os.path.join(input_dir, img_name)
             gt_path = os.path.join(gt_dir, img_name)
-            # 若分数缺失，补一个全为0.0的字典
-            if i < len(scores):
-                score = scores[i]
-            else:
-                score = {k: 0.0 for k in all_keys}
-            self.samples.append((input_path, gt_path, img_name, score))
+            # 推理阶段不返回分数（scores.txt 可能存在但不泄露）
+            self.samples.append((input_path, gt_path, img_name))
     
     def __len__(self):
         return len(self.samples)
     
     def __getitem__(self, index):
-        input_path, gt_path, img_name, score = self.samples[index]
+        input_path, gt_path, img_name = self.samples[index]
         input_img = self.loader(input_path)
         gt_img = self.loader(gt_path)
         if self.transform:
@@ -172,4 +168,4 @@ class MoETestDataset(Dataset):
         else:
             input_img = ToTensor()(input_img)
             gt_img = ToTensor()(gt_img)
-        return input_img, gt_img, img_name, score
+        return input_img, gt_img, img_name

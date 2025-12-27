@@ -31,6 +31,11 @@ def main(args):
 
     # 加载模型
     model = MoE(score_dim=args.class_num)
+
+    # 动态修复 reconstruction_net 输入通道以兼容预训练权重（权重为67通道）
+    if hasattr(model, 'reconstruction_net') and model.reconstruction_net[0].in_channels != 67:
+        print(f"Patching reconstruction_net input channels from {model.reconstruction_net[0].in_channels} to 67")
+        model.reconstruction_net[0] = torch.nn.Conv2d(67, 64, 3, padding=1)
     
     if not os.path.exists(args.weights_path):
         print(f"Error: Weights file not found at {args.weights_path}")
@@ -62,7 +67,7 @@ def main(args):
 
     with torch.no_grad():
         for idx, batch in enumerate(test_loader):
-            inputs, targets, img_names, scores = batch
+            inputs, targets, img_names = batch
             inputs = inputs.to(device)
             targets = targets.to(device)
 
@@ -76,24 +81,8 @@ def main(args):
             if padh > 0 or padw > 0:
                 inputs = torch.nn.functional.pad(inputs, (0, padw, 0, padh), 'reflect')
             
-            # 处理score
-            if isinstance(scores, dict):
-                score_keys = ['fog', 'rain', 'snow']
-                # 确保每个score都是tensor并移动到设备
-                score_list = []
-                for k in score_keys:
-                    s = scores[k]
-                    if not isinstance(s, torch.Tensor):
-                        s = torch.tensor(s)
-                    score_list.append(s.to(inputs.device).to(inputs.dtype))
-                score_tensor = torch.stack(score_list, dim=1)
-            elif scores is None:
-                score_tensor = None
-            else:
-                score_tensor = torch.tensor(scores, dtype=inputs.dtype, device=inputs.device).view(-1, 3)
-            
-            # 推理
-            outputs = model(inputs, score=score_tensor)
+            # 推理（测试阶段不提供分数）
+            outputs = model(inputs, score=None)
             
             # 裁剪回原始尺寸
             final_out = outputs['final_output'][:, :, :h, :w].clamp(0, 1)
