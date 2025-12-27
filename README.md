@@ -173,5 +173,11 @@ python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --te
     if unexpected_keys:
         print("Unexpected keys:", unexpected_keys)
    ```
-4. 
-   
+4. 在训练MoE架构的时候，发现输出的专家权重与输入的分数相关性极差，说明“分数特征→门控”的通路没有发挥作用，且专家的预训练模型出现遗忘现象，而是重建头在进行兜底。同时在门控应用apply_mask_and_renorm函数之前，expert_weights的三个权重中，第一个的权重非常大（0.95左右）；而feature_weights的三个权重中，第二个的权重非常大（0.95左右）出现错误的可能原因有：
+   1. 若训练集中“雾”场景占比或分数偏高，会把门控推向“去雾专家”常胜分布，可尝试对三个分数的尺度进行处理，使分布更均衡。
+   2. 学习率过高导致专家预训练的知识跑偏，可尝试先冻结三个专家，仅训练 gate + fusion + reconstruction 5–10 epoch，但要注意不能冻结太久；再解冻专家，给专家更低学习率。参数分组学习率：gate/fusion/recon: 1e-4，experts: 1e-5 或更低。
+   3. VGG 感知/对比损失在未做 ImageNet 归一化时，可能引入色彩偏移压力；或权重过大让模型优先“远离输入”，出现颜色异常。可尝试对 final_out/targets/inputs 做 ImageNet 归一化，并降低对比损失权重
+
+5. 发现对于训练时候的数据集，对于所有的单一天气图像，moe_output都能有非常好的处理结果，但是只要是有雾在的双/多场景图像，只会除掉雾，而且雾处理的非常好，雪和雨完全无法去除。
+   1. 可能的原因还是如4所说，雾的loss更低，导致只要存在雾，模型就会将更多的权重分给雾。
+
