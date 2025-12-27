@@ -28,7 +28,7 @@ class MoEGate(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
             nn.Linear(hidden_dim, num_experts),
-            nn.Softmax(dim=1)
+            nn.Sigmoid()
         )
         self.feature_fc = nn.Sequential(
             nn.Linear(hidden_dim + score_dim, hidden_dim),
@@ -36,7 +36,7 @@ class MoEGate(nn.Module):
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
             nn.Linear(hidden_dim, num_experts),
-            nn.Softmax(dim=1)
+            nn.Sigmoid()
         )
 
     def forward(self, x, score=None):
@@ -65,16 +65,11 @@ class MoEGate(nn.Module):
                 score_vec = torch.tensor(score, dtype=feat.dtype, device=feat.device).view(feat.size(0), -1)
             # 构建掩码：>0为1，否则为0
             mask = (score_vec > 0).float()
-            # 对专家权重进行掩蔽并重新归一化（若全为0则保持原值以避免除零）
-            def apply_mask_and_renorm(weights, mask):
-                masked = weights * mask
-                s = masked.sum(dim=1, keepdim=True)
-                # 若某样本mask求和为0（无激活项），则退回原权重；否则做归一化
-                safe = torch.where(s > 0, masked / (s + 1e-8), weights)
-                return safe
             
-            expert_weights = apply_mask_and_renorm(expert_weights, mask)
-            feature_weights = apply_mask_and_renorm(feature_weights, mask)
+            # 仅进行掩蔽，不再归一化，允许独立激活
+            expert_weights = expert_weights * mask
+            feature_weights = feature_weights * mask
+            
         return expert_weights, feature_weights
     
 
@@ -162,8 +157,6 @@ class MoE(nn.Module):
             nn.Conv2d(32, 3, 3, padding=1),
             nn.Tanh()
         )
-        # 残差连接
-        self.residual_conv = nn.Conv2d(3, 3, 1)
 
     def forward(self, x, score=None):
         # 保存原始输入
@@ -189,11 +182,13 @@ class MoE(nn.Module):
         batch_size = expert_outputs.size(0)
         expert_weights = expert_weights.view(batch_size, 3, 1, 1, 1)  # 扩展维度以进行广播
         
-        # 对每个专家的输入进行加权
-        weighted_outputs = expert_outputs * expert_weights
-        
-        # 对每个专家的输出进行求和
-        moe_output = torch.sum(weighted_outputs, dim=1)
+        # 采用残差组合方式：moe_output = x - sum(w_i * (x - O_i))
+        # 假设专家输出 O_i 为去噪后的图像，则 (x - O_i) 为专家估计的噪声/天气成分
+        # 这种方式允许叠加多种天气成分的去除
+        x_expanded = x.unsqueeze(1) # [B, 1, C, H, W]
+        residuals = x_expanded - expert_outputs
+        weighted_residuals = residuals * expert_weights
+        moe_output = x - torch.sum(weighted_residuals, dim=1)
 
         # 最终重建（融合特征 + MoE输出）
         if fused_features is not None:
@@ -204,9 +199,10 @@ class MoE(nn.Module):
         else:
             combined = moe_output
         # 最终重建
-        final_output = self.reconstruction_net(combined)
-        # 残差连接
-        final_output = final_output + self.residual_conv(original_input)
+        # 使用重建网络对MoE的粗略输出进行残差精修，而不是重新预测
+        refinement = self.reconstruction_net(combined)
+        final_output = moe_output + refinement
+        
         # 返回结果和中间信息（用于训练监控）
         return {
             'final_output': final_output,
