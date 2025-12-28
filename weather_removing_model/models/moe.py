@@ -23,7 +23,7 @@ class MoEGate(nn.Module):
             nn.Flatten()
         )
         self.expert_fc = nn.Sequential(
-            nn.Linear(hidden_dim + score_dim, hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
@@ -31,7 +31,7 @@ class MoEGate(nn.Module):
             nn.Sigmoid()
         )
         self.feature_fc = nn.Sequential(
-            nn.Linear(hidden_dim + score_dim, hidden_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(True),
@@ -42,34 +42,10 @@ class MoEGate(nn.Module):
     def forward(self, x, score=None):
         # x: [B, C, H, W], score: [B, score_dim] or None
         feat = self.gate_conv(x)  # [B, hidden_dim]
-        if score is not None:
-            score_vec = score if isinstance(score, torch.Tensor) else torch.tensor(score, dtype=feat.dtype, device=feat.device).view(feat.size(0), -1)
-            
-            # 确保score_vec维度正确
-            if score_vec.dim() == 1:
-                score_vec = score_vec.unsqueeze(1)
-            
-            # 拼接score
-            feat = torch.cat([feat, score_vec], dim=1)
-        else:
-            # 没有得分则补零
-            feat = torch.cat([feat, torch.zeros(feat.size(0), self.score_dim, device=feat.device, dtype=feat.dtype)], dim=1)
         
         expert_weights = self.expert_fc(feat)   # [B, num_experts]
         feature_weights = self.feature_fc(feat) # [B, num_experts]
 
-        # 当提供了score时，使用score作为掩码强制仅激活对应专家
-        if score is not None:
-            # 期望score为[B, 3]，对应[fog, rain, snow]，>0表示该天气存在
-            if not isinstance(score_vec, torch.Tensor):
-                score_vec = torch.tensor(score, dtype=feat.dtype, device=feat.device).view(feat.size(0), -1)
-            # 构建掩码：>0为1，否则为0
-            mask = (score_vec > 0).float()
-            
-            # 仅进行掩蔽，不再归一化，允许独立激活
-            expert_weights = expert_weights * mask
-            feature_weights = feature_weights * mask
-            
         return expert_weights, feature_weights
     
 

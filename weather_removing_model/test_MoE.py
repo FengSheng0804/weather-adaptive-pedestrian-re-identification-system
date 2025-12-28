@@ -82,7 +82,7 @@ def main(args):
                 inputs = torch.nn.functional.pad(inputs, (0, padw, 0, padh), 'reflect')
             
             # 推理（测试阶段不提供分数）
-            outputs = model(inputs, score=None)
+            outputs = model(inputs)
             
             # 裁剪回原始尺寸
             final_out = outputs['final_output'][:, :, :h, :w].clamp(0, 1)
@@ -144,7 +144,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default='datasets/MoEDataset', help='数据集路径')
-    parser.add_argument('--weights_path', type=str, default='weather_removing_model/weights/moe_best_train2.pth', help='模型权重路径')
+    parser.add_argument('--weights_path', type=str, default='weather_removing_model/weights/moe_best_train3.pth', help='模型权重路径')
     parser.add_argument('--save_dir', type=str, default='weather_removing_model/results/predict', help='结果保存路径')
     parser.add_argument('--batch_size', type=int, default=1, help='批量大小')
     parser.add_argument('--num_workers', type=int, default=2, help='数据加载线程数')

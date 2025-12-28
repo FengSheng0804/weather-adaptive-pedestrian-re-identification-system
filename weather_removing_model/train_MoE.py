@@ -2,7 +2,6 @@ import os
 import argparse
 from collections import OrderedDict
 
-from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -168,76 +167,14 @@ def train_worker(local_rank, args):
         for batch in train_loader:
             inputs, targets, _, scores = batch
 
-            # # 显示输入的batch个图像在一张图像上，并把图像对应的scores标在图像的左上角
-            # import matplotlib.pyplot as plt
-            # import torchvision
-            # import numpy as np
-            # if is_master:
-            #     nrow = 4
-            #     batch_imgs = inputs.cpu()
-            #     # 处理分数
-            #     if isinstance(scores, dict):
-            #         score_keys = ['fog', 'rain', 'snow']
-            #         batch_scores = torch.stack([scores[k].cpu() for k in score_keys], dim=1).numpy()  # [B,3]
-            #     elif scores is None:
-            #         batch_scores = None
-            #     else:
-            #         batch_scores = np.array(scores)
-            #         if batch_scores.ndim == 1:
-            #             batch_scores = batch_scores.reshape(-1, 3)
-            #     # 绘制每张图像并标注分数
-            #     imgs = []
-            #     for i in range(batch_imgs.size(0)):
-            #         img = batch_imgs[i]
-            #         img = torchvision.transforms.functional.to_pil_image(img)
-            #         img = np.array(img)
-            #         fig, ax = plt.subplots()
-            #         ax.imshow(img)
-            #         ax.axis('off')
-            #         # 标注分数
-            #         if batch_scores is not None:
-            #             score_str = ', '.join([f'{k}:{batch_scores[i, j]:.2f}' for j, k in enumerate(['fog', 'rain', 'snow'])])
-            #             ax.text(2, 12, score_str, color='yellow', fontsize=10, bbox=dict(facecolor='black', alpha=0.5, pad=1))
-            #         fig.canvas.draw()
-            #         img_ann = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-            #         img_ann = img_ann.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-            #         imgs.append(img_ann)
-            #         plt.close(fig)
-            #     # 拼接成网格
-            #     rows = []
-            #     for i in range(0, len(imgs), nrow):
-            #         row_imgs = imgs[i:i+nrow]
-            #         # 补齐空白
-            #         while len(row_imgs) < nrow:
-            #             row_imgs.append(np.zeros_like(row_imgs[0]))
-            #         rows.append(np.concatenate(row_imgs, axis=1))
-            #     grid_img = np.concatenate(rows, axis=0)
-            #     plt.figure(figsize=(8, 8))
-            #     plt.imshow(grid_img)
-            #     plt.axis('off')
-            #     plt.title(f'Input Batch at Step {global_step}')
-            #     plt.show()
-
             inputs = inputs.to(device)
             targets = targets.to(device)
-            # 支持score为dict of tensor（如{'fog':tensor([..]),...}），或list of dict
-            if isinstance(scores, dict):
-                score_keys = ['fog', 'rain', 'snow']
-                score_tensor = torch.stack([scores[k].to(inputs.device).to(inputs.dtype) for k in score_keys], dim=1)  # [B,3]
-            elif scores is None:
-                score_tensor = None
-            else:
-                score_tensor = torch.tensor(scores, dtype=inputs.dtype, device=inputs.device).view(-1, 3)
 
             # 准备门控对齐的目标：二值化，存在即为1
             gate_target = None
-            if score_tensor is not None:
-                gate_target = (score_tensor > 0).float()
-                # 注意：不再对score_tensor进行Softmax归一化，因为我们改用了Sigmoid独立门控
-                # score_tensor保持原值传入模型作为条件输入
 
             optimizer.zero_grad()
-            outputs = model(inputs, score=score_tensor)
+            outputs = model(inputs)
             final_out = outputs['final_output']
             features = outputs['fused_features']
             gate_weights = outputs['expert_weights']  # [B, num_experts] or [B, 3, 1, 1, 1]
@@ -266,17 +203,9 @@ def train_worker(local_rank, args):
                 if gw.dim() > 2:
                     gw = gw.view(gw.size(0), -1)
                 # 只支持单一score（如强度），多score可扩展
-                if score_tensor is not None and score_tensor.size(1) == 3:
-                    for i in range(gw.size(1)):
-                        for j, k in enumerate(['fog', 'rain', 'snow']):
-                            writer.add_scalars(f'gate_vs_score/scatter_expert{i+1}_vs_{k}', {f'score_{kk}': gw[kk, i].item() for kk in range(gw.size(0))}, global_step)
-
-            # calculate unified loss (score加权)
-            if score_tensor is not None:
-                norm_score = (score_tensor - score_tensor.min(dim=0, keepdim=True)[0]) / (score_tensor.max(dim=0, keepdim=True)[0] - score_tensor.min(dim=0, keepdim=True)[0] + 1e-8)
-                sample_weights = 1.0 + norm_score.max(dim=1)[0]
-            else:
-                sample_weights = torch.ones(inputs.size(0), device=inputs.device)
+                for i in range(gw.size(1)):
+                    for j, k in enumerate(['fog', 'rain', 'snow']):
+                        writer.add_scalars(f'gate_vs_score/scatter_expert{i+1}_vs_{k}', {f'score_{kk}': gw[kk, i].item() for kk in range(gw.size(0))}, global_step)
 
             # calculate losses
             l1 = l1_loss(final_out, targets)
@@ -291,7 +220,7 @@ def train_worker(local_rank, args):
             if moe_out is not None:
                 moe_l1 = l1_loss(moe_out, targets)
 
-            base_loss = (0.8 * l1 * sample_weights).mean() + 0.15 * ssim_val + 0.05 * contrast + 0.2 * moe_l1
+            base_loss = (0.8 * l1).mean() + 0.15 * ssim_val + 0.05 * contrast + 0.2 * moe_l1
 
             # 负载均衡与对齐损失 (适配Sigmoid门控)
             gate_flat = gate_weights
@@ -469,7 +398,7 @@ def main():
     parser.add_argument('--gate_entropy_coef', type=float, default=5e-2, help='coef for gate entropy regularization')
     parser.add_argument('--gate_balance_coef', type=float, default=5e-2, help='coef for batch-level uniform KL')
     # Freeze-then-unfreeze config
-    parser.add_argument('--freeze_experts_epochs', type=int, default=2, help='Freeze experts for N initial epochs')
+    parser.add_argument('--freeze_experts_epochs', type=int, default=1, help='Freeze experts for N initial epochs')
     parser.add_argument('--log_interval', type=int, default=50)
     parser.add_argument('--vis_interval', type=int, default=200, help='steps between image visualizations')
     parser.add_argument('--vis_count', type=int, default=5, help='number of images to visualize per write')
