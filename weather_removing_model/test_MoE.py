@@ -88,6 +88,9 @@ def main(args):
             final_out = outputs['final_output'][:, :, :h, :w].clamp(0, 1)
             moe_out = outputs['moe_output'][:, :, :h, :w].clamp(0, 1)
             expert_weights = outputs['expert_weights']
+            defog_output = outputs['defog_output'][:, :, :h, :w].clamp(0, 1)
+            derain_output = outputs['derain_output'][:, :, :h, :w].clamp(0, 1)
+            desnow_output = outputs['desnow_output'][:, :, :h, :w].clamp(0, 1)
             
             if isinstance(expert_weights, torch.Tensor):
                 expert_weights = expert_weights.cpu().numpy()
@@ -128,12 +131,22 @@ def main(args):
             
             # 保存图片
             for i in range(final_out.size(0)):
+                # 保存各专家输出
+                defog_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_defog.jpg")
+                save_image(defog_output[i], defog_path)
+                derain_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_derain.jpg")
+                save_image(derain_output[i], derain_path)
+                desnow_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_desnow.jpg")
+                save_image(desnow_output[i], desnow_path)
                 # 保存最终输出
                 out_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_out.jpg")
                 save_image(final_out[i], out_path)
                 # 保存MoE输出
                 moe_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_moe.jpg")
                 save_image(moe_out[i], moe_path)
+                # 保存ground truth
+                gt_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_gt.jpg")
+                save_image(targets[i], gt_path)
             
             print(f"Processed batch {idx+1}/{len(test_loader)}, PSNR: {batch_psnr:.2f}, SSIM: {batch_ssim:.4f}")
 
@@ -144,7 +157,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_dir', type=str, default='datasets/MoEDataset', help='数据集路径')
-    parser.add_argument('--weights_path', type=str, default='weather_removing_model/weights/moe_best_train3.pth', help='模型权重路径')
+    parser.add_argument('--weights_path', type=str, default='weather_removing_model/weights/moe_best.pth', help='模型权重路径')
     parser.add_argument('--save_dir', type=str, default='weather_removing_model/results/predict', help='结果保存路径')
     parser.add_argument('--batch_size', type=int, default=1, help='批量大小')
     parser.add_argument('--num_workers', type=int, default=2, help='数据加载线程数')
