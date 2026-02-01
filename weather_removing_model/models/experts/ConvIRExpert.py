@@ -3,15 +3,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .modules import BasicConv, EBlock, DBlock, FAM, SCM
 
-# 修改后的ConvIR专家网络（去雪）
+# 修改后的ConvIR专家网络（去雪），采用的是经过重参数化后的网络结构
 class ConvIRExpert(nn.Module):
-    def __init__(self, return_features=True):
+    def __init__(self, num_res=8, base_channel=32, return_features=True):
         super(ConvIRExpert, self).__init__()
         self.return_features = return_features
-        
-        num_res = 8
-        base_channel = 32
-        
+                
         # 编码器
         self.Encoder = nn.ModuleList([
             EBlock(base_channel, num_res),

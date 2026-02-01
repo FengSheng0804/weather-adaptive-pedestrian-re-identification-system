@@ -8,6 +8,7 @@ datasets/MoEDataset/
 fog_removing_model/results/
 rain_removing_model/results/
 snow_removing_model/results/
+weather_removing_model/results/
 
 # 删除模型权重文件
 fog_removing_model/weights/best_before_reparam.pk

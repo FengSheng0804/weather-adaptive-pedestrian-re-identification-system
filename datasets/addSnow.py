@@ -38,9 +38,22 @@ def add_snow(
     wind_speed=((1, 5), (1, 2)),
     blur_angle_variance=30,
     snow_brightness=255,
-    snow_intensity=0.7
+    snow_intensity=0.7,
+    return_mask=False
 ):
-    """添加雪花效果的主要函数"""
+    """
+    添加雪花效果的主要函数
+    original_image: 输入图像 (numpy数组)
+    snow_count: 雪花数量范围 (min, max)
+    snow_size_range: 雪花尺寸范围 ((min_small, max_small), (min_large, max_large))
+    small_radio: 小雪花比例范围 (min, max)
+    alpha: 雪花透明度范围 (min, max)，值越大雪越明显
+    wind_speed: 风速范围 ((min_x, max_x), (min_y, max_y))
+    blur_angle_variance: 模糊角度的随机变化范围
+    snow_brightness: 雪花亮度 (0-255)
+    snow_intensity: 雪花强度 (0-1)
+    return_mask: 是否返回雪花掩码
+    """
     
     h, w = original_image.shape[:2]
     # 创建雪花蒙版（单通道）
@@ -62,6 +75,7 @@ def add_snow(
             x = random.randint(0, w - 1)
             y = random.randint(0, h - 1)
             size = random.randint(*size_range)
+            # opacity 控制雪花的透明度和亮度，opacity_factor 越大雪花越明显
             opacity = opacity_factor * size * (snow_brightness / 255.0)
             
             # 为每个雪花生成略微不同的模糊角度
@@ -163,51 +177,57 @@ def add_snow(
     snowy_img = (np.clip(snowy_img, 0, 1) * 255.0).astype(np.uint8)
     
     # 调整雪花强度
-    snow_mask = np.any(snowy_img > original_image, axis=2, keepdims=True)
+    snow_mask_bin = np.any(snowy_img > original_image, axis=2, keepdims=True)
     result = original_image.copy().astype(np.float32)
     snowy_float = snowy_img.astype(np.float32)
     
     # 线性混合
-    result = result * (1 - snow_intensity * snow_mask) + snowy_float * snow_intensity * snow_mask
+    result = result * (1 - snow_intensity * snow_mask_bin) + snowy_float * snow_intensity * snow_mask_bin
     result = np.clip(result, 0, 255).astype(np.uint8)
     
     # 归一化（区间可根据实际数据调整）
     snow_count_score = np.clip((snow_count_value - 50) / (1200.0 - 50), 0, 1)  # 假设最大1200个雪花
-    alpha_score = 1 - np.clip((alpha_used - 0.2) / (0.3 - 0.2), 0, 1)            # 透明度越大分数越小
+    alpha_score = 1 - np.clip((alpha_used - 0.1) / (0.2 - 0.1), 0, 1)            # 透明度越大分数越小
     small_radio_score = 1 - np.clip((small_radio_used - 0.75) / (0.95 - 0.75), 0, 1)  # 越多小雪花分数越高
     snow_score = float(snow_count_score * 0.9 + alpha_score * 0.05 + small_radio_score * 0.05)
-    return result, snow_score
+
+    if return_mask:
+        # 生成雪区域掩码
+        snow_mask_uint8 = (snow_mask_before * 255).astype(np.uint8)
+        return result, snow_score, snow_mask_uint8
+    else:
+        return result, snow_score
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--input_dir', type=str, default=r'datasets/DesnowDataset/train/ground_truth', help='输入图片文件夹')
-    parser.add_argument('--output_dir', type=str, default=r'datasets/DesnowDataset/train/snowy_image', help='输出图片文件夹')
-    parser.add_argument('--num', type=int, default=1, help='每张图片生成的加雪效果数量')
-    args = parser.parse_args()
+    # import argparse
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--input_dir', type=str, default=r'datasets/DesnowDataset/train/ground_truth', help='输入图片文件夹')
+    # parser.add_argument('--output_dir', type=str, default=r'datasets/DesnowDataset/train/snowy_image', help='输出图片文件夹')
+    # parser.add_argument('--num', type=int, default=1, help='每张图片生成的加雪效果数量')
+    # args = parser.parse_args()
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    # if not os.path.exists(args.output_dir):
+    #     os.makedirs(args.output_dir)
 
-    for fname in os.listdir(args.input_dir):
-        if fname.lower().endswith('.jpg'):
-            img_path = os.path.join(args.input_dir, fname)
-            img = cv2.imread(img_path)
-            for i in range(1, args.num + 1):
-                snow_img = add_snow(
-                    original_image=img,
-                    snow_count=(200, 1500),  # 增加雪花数量
-                    snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
-                    small_radio=(0.75, 0.95),  # 增加小雪花比例
-                    alpha=(0.2, 0.3),
-                    wind_speed=((1, 2), (1, 2)),  # 增加风速
-                    blur_angle_variance=20,
-                    snow_intensity=0.8  # 增加雪花强度
-                )
-                out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
-                out_path = os.path.join(args.output_dir, out_name)
-                cv2.imwrite(out_path, snow_img)
-                print(f"已保存: {out_path}")
+    # for fname in os.listdir(args.input_dir):
+    #     if fname.lower().endswith('.jpg'):
+    #         img_path = os.path.join(args.input_dir, fname)
+    #         img = cv2.imread(img_path)
+    #         for i in range(1, args.num + 1):
+    #             snow_img = add_snow(
+    #                 original_image=img,
+    #                 snow_count=(200, 1500),  # 增加雪花数量
+    #                 snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
+    #                 small_radio=(0.75, 0.95),  # 增加小雪花比例
+    #                 alpha=(0.1, 0.2),
+    #                 wind_speed=((1, 2), (1, 2)),  # 增加风速
+    #                 blur_angle_variance=20,
+    #                 snow_intensity=0.8  # 增加雪花强度
+    #             )
+    #             out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
+    #             out_path = os.path.join(args.output_dir, out_name)
+    #             cv2.imwrite(out_path, snow_img)
+    #             print(f"已保存: {out_path}")
 
 
     # # 测试分数代码
@@ -226,7 +246,7 @@ if __name__ == "__main__":
     #                 snow_count=(50, 1200),  # 增加雪花数量
     #                 snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
     #                 small_radio=(0.75, 0.95),  # 增加小雪花比例
-    #                 alpha=(0.2, 0.3),
+    #                 alpha=(0.1, 0.2),
     #                 wind_speed=((1, 2), (1, 2)),  # 增加风速
     #                 blur_angle_variance=20,
     #                 snow_intensity=0.8  # 增加雪花强度
@@ -234,3 +254,27 @@ if __name__ == "__main__":
     #             out_path = os.path.join(output_dir, f"{snow_score:.4f}_" + fname)
     #             cv2.imwrite(out_path, snow_img)
     #             print(f"已保存: {out_path}， 雪花分数: {snow_score}")
+
+    # 测试带掩码的加雪
+    input_dir = r'datasets/DesnowDataset/train/ground_truth'
+    output_dir = r'datasets/DesnowDataset/train/snow_mask'
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    for fname in os.listdir(input_dir):
+        if fname.lower().endswith('.jpg'):
+            img_path = os.path.join(input_dir, fname)
+            img = cv2.imread(img_path)
+            snow_img, snow_score, snow_mask = add_snow(
+                original_image=img,
+                snow_count=(200, 1500),  # 增加雪花数量
+                snow_size_range=((1, 2), (2, 3)),  # 小雪花和大雪花的尺寸
+                small_radio=(0.75, 0.95),  # 增加小雪花比例
+                alpha=(0.1, 0.2),
+                wind_speed=((1, 2), (1, 2)),  # 增加风速
+                blur_angle_variance=20,
+                snow_intensity=0.8,  # 增加雪花强度
+                return_mask=True
+            )
+            out_path = os.path.join(output_dir, f"{snow_score:.4f}_" + fname)
+            cv2.imwrite(out_path, snow_mask)
+            print(f"已保存: {out_path}， 雪花分数: {snow_score}")

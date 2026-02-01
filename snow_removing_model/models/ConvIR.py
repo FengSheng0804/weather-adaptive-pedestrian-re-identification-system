@@ -55,11 +55,8 @@ class FAM(nn.Module):
         return self.merge(torch.cat([x1, x2], dim=1))
 
 class ConvIR(nn.Module):
-    def __init__(self):
+    def __init__(self, num_res=8, base_channel=32):
         super(ConvIR, self).__init__()
-        
-        num_res = 8
-        base_channel = 32
 
         self.Encoder = nn.ModuleList([
             EBlock(base_channel, num_res),

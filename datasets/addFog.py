@@ -3,7 +3,7 @@ import numpy as np
 import math
 import os
 
-def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8), use_depth_map=False, depth_map=None):
+def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8), use_depth_map=False, depth_map=None, return_mask=False):
     """
     基于大气散射模型的图像加雾算法
     
@@ -65,7 +65,7 @@ def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8)
     brightness_val = float(brightness)
 
     # 归一化（区间可根据实际数据调整）
-    beta_norm = (beta_val - 0.01) / (0.08 - 0.01)  # beta_range
+    beta_norm = (beta_val - 0.01) / (0.04 - 0.01)  # beta_range
     brightness_norm = (brightness_val - 0.6) / (0.8 - 0.6)  # brightness_range
     # 越大雾越重：beta↑, brightness↓
     brightness_score = 1 - np.clip(brightness_norm, 0, 1)
@@ -73,7 +73,12 @@ def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8)
     # 综合分数
     fog_score = float(beta_score * 0.9 + brightness_score * 0.1)
 
-    return fogged_img, fog_score
+    if return_mask:
+        # 返回雾化区域掩码，全1
+        mask = np.ones((row, col), dtype=np.uint8) * 255
+        return fogged_img, fog_score, mask
+    else:
+        return fogged_img, fog_score
 
 if __name__ == "__main__":
     import argparse
@@ -93,7 +98,7 @@ if __name__ == "__main__":
             for i in range(1, args.num + 1):
                 fog_img = add_fog(
                     original_image=img,
-                    beta_range=(0, 0.08),
+                    beta_range=(0.01, 0.04),
                     brightness_range=(0.6, 0.8)
                 )
                 out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
@@ -115,8 +120,26 @@ if __name__ == "__main__":
     #         for i in range(1, num + 1):
     #             fog_img, fog_score = add_fog(
     #                 original_image=img,
-    #                 beta_range=(0.01, 0.08),
+    #                 beta_range=(0.01, 0.04),
     #                 brightness_range=(0.6, 0.8)
     #             )
     #             out_path = os.path.join(output_dir, f"{fog_score:.4f}_" + fname)
     #             cv2.imwrite(out_path, fog_img)
+
+    # # 测试带掩码的加雾
+    # input_dir = r'datasets/DefogDataset/train/ground_truth'
+    # output_dir = r'datasets/DefogDataset/train/fog_mask'
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
+    # for fname in os.listdir(input_dir):
+    #     if fname.lower().endswith('.jpg'):
+    #         img_path = os.path.join(input_dir, fname)
+    #         img = cv2.imread(img_path)
+    #         fog_img, fog_score, fog_mask = add_fog(
+    #             original_image=img,
+    #             beta_range=(0.01, 0.04),
+    #             brightness_range=(0.6, 0.8),
+    #             return_mask=True
+    #         )
+    #         out_path = os.path.join(output_dir, f"{fog_score:.4f}_" + fname)
+    #         cv2.imwrite(out_path, fog_mask)

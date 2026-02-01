@@ -12,7 +12,7 @@ import time
 
 parser = argparse.ArgumentParser(description="PReNet_Test")
 parser.add_argument("--logdir", type=str, default="rain_removing_model/weights", help='path to model and log files')
-parser.add_argument("--data_path", type=str, default="datasets/DerainDataset/train", help='path to training data')
+parser.add_argument("--data_path", type=str, default="datasets/DerainDataset/test", help='path to training data')
 parser.add_argument("--result_dir", type=str, default="rain_removing_model/results", help='path to save results')
 parser.add_argument("--use_GPU", type=bool, default=True, help='use GPU or not')
 parser.add_argument("--gpu_id", type=str, default="0", help='GPU id')

@@ -142,3 +142,42 @@ python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --te
    1. 解决办法：使用分块训练的方法。
 
 2. MoE架构的数据集如何生成？
+
+3. 在加载预训练模型的时候，对于DEANet，使用`fog_removing_model/models/backbone_train.py`中的DEANet的网络结构无法正常加载`fog_removing_model\weights\best_before_reparam.pk`模型？
+   1. 原因是在于，在训练DEANet.py的时候，保存网络结构之前，会使用`DataParallal`对网络进行处理:
+   ```python
+    if opt.device == 'cuda':
+    net = torch.nn.DataParallel(net)
+    cudnn.benchmark = True
+   ```
+   导致在保存模型的参数的时候，会自动加上`module.`前缀，使得参数不能正常加载，因此需要使用专门的函数将该前缀删除:
+   ```python
+    def remove_module_prefix(state_dict):
+        from collections import OrderedDict
+        new_state_dict = OrderedDict()
+        for k, v in state_dict.items():
+            if k.startswith('module.'):
+                new_state_dict[k[7:]] = v
+            else:
+                new_state_dict[k] = v
+        return new_state_dict
+   ```
+   这样才能正常加载网络模型。
+   如果参数对应不上，可以通过以下方式对模型的参数进行检查，同时需要注意保存模型的时候是否直接保存的参数，如果不是，可能还需要通过访问字典['model']才可以加载参数。
+   ```python
+    convir_model = ConvIRExpert(return_features=False)
+    missing_keys, unexpected_keys = convir_model.load_state_dict(torch.load('weather_removing_model/weights/ConvIR_pretrained.pkl')['model'], strict=False)
+    print("=" * 50)
+    if missing_keys:
+        print("Missing keys:", missing_keys)
+    if unexpected_keys:
+        print("Unexpected keys:", unexpected_keys)
+   ```
+4. 在训练MoE架构的时候，发现输出的专家权重与输入的分数相关性极差，说明“分数特征→门控”的通路没有发挥作用，且专家的预训练模型出现遗忘现象，而是重建头在进行兜底。同时在门控应用apply_mask_and_renorm函数之前，expert_weights的三个权重中，第一个的权重非常大（0.95左右）；而feature_weights的三个权重中，第二个的权重非常大（0.95左右）出现错误的可能原因有：
+   1. 若训练集中“雾”场景占比或分数偏高，会把门控推向“去雾专家”常胜分布，可尝试对三个分数的尺度进行处理，使分布更均衡。
+   2. 学习率过高导致专家预训练的知识跑偏，可尝试先冻结三个专家，仅训练 gate + fusion + reconstruction 5–10 epoch，但要注意不能冻结太久；再解冻专家，给专家更低学习率。参数分组学习率：gate/fusion/recon: 1e-4，experts: 1e-5 或更低。
+   3. VGG 感知/对比损失在未做 ImageNet 归一化时，可能引入色彩偏移压力；或权重过大让模型优先“远离输入”，出现颜色异常。可尝试对 final_out/targets/inputs 做 ImageNet 归一化，并降低对比损失权重
+
+5. 发现对于训练时候的数据集，对于所有的单一天气图像，moe_output都能有非常好的处理结果，但是只要是有雾在的双/多场景图像，只会除掉雾，而且雾处理的非常好，雪和雨完全无法去除。
+   1. 可能的原因还是如4所说，雾的loss更低，导致只要存在雾，模型就会将更多的权重分给雾。
+
