@@ -179,23 +179,7 @@ def train_worker(local_rank, args):
             features = outputs['fused_features']
             gate_weights = outputs['expert_weights']  # [B, num_experts] or [B, 3, 1, 1, 1]
             feature_weights = outputs.get('feature_weights', None)  # [B, num_experts]，新版moe.py已返回
-            # === 计算各专家loss ===
-            defog_out = outputs.get('defog_output', None)
-            derain_out = outputs.get('derain_output', None)
-            desnow_out = outputs.get('desnow_output', None)
-            # L1
-            defog_l1 = l1_loss(defog_out, targets) if defog_out is not None else torch.tensor(0.0, device=inputs.device)
-            derain_l1 = l1_loss(derain_out, targets) if derain_out is not None else torch.tensor(0.0, device=inputs.device)
-            desnow_l1 = l1_loss(desnow_out, targets) if desnow_out is not None else torch.tensor(0.0, device=inputs.device)
-            # SSIM
-            defog_ssim = 1 - ssim(defog_out, targets) if defog_out is not None else torch.tensor(0.0, device=inputs.device)
-            derain_ssim = 1 - ssim(derain_out, targets) if derain_out is not None else torch.tensor(0.0, device=inputs.device)
-            desnow_ssim = 1 - ssim(desnow_out, targets) if desnow_out is not None else torch.tensor(0.0, device=inputs.device)
-            # Contrast
-            defog_contrast = contrast_loss(defog_out, targets, inputs) if defog_out is not None else torch.tensor(0.0, device=inputs.device)
-            derain_contrast = contrast_loss(derain_out, targets, inputs) if derain_out is not None else torch.tensor(0.0, device=inputs.device)
-            desnow_contrast = contrast_loss(desnow_out, targets, inputs) if desnow_out is not None else torch.tensor(0.0, device=inputs.device)
-            
+
             # 可视化gate输出与score的关系
             if is_master and writer is not None and global_step % args.log_interval == 0:
                 # 展开gate_weights为[B, num_experts]
@@ -263,9 +247,7 @@ def train_worker(local_rank, args):
                 cur_time = time.time()
                 elapsed = cur_time - last_time
                 print(f"Epoch {epoch} Step {global_step} | loss {loss.item():.4f} | PSNR {cur_psnr:.2f} | SSIM {cur_ssim:.4f} | time {elapsed:.2f}s")
-                print(f"  [Expert L1] defog: {defog_l1.item():.4f}, derain: {derain_l1.item():.4f}, desnow: {desnow_l1.item():.4f}")
-                print(f"  [Expert SSIM] defog: {defog_ssim.item():.4f}, derain: {derain_ssim.item():.4f}, desnow: {desnow_ssim.item():.4f}")
-                print(f"  [Expert Contrast] defog: {defog_contrast.item():.4f}, derain: {derain_contrast.item():.4f}, desnow: {desnow_contrast.item():.4f}")
+
                 last_time = cur_time
                 # TensorBoard scalars
                 if writer is not None:
