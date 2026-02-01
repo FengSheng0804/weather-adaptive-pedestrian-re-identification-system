@@ -65,7 +65,7 @@ def add_fog(original_image, beta_range=(0.01, 0.08), brightness_range=(0.6, 0.8)
     brightness_val = float(brightness)
 
     # 归一化（区间可根据实际数据调整）
-    beta_norm = (beta_val - 0.01) / (0.08 - 0.01)  # beta_range
+    beta_norm = (beta_val - 0.01) / (0.04 - 0.01)  # beta_range
     brightness_norm = (brightness_val - 0.6) / (0.8 - 0.6)  # brightness_range
     # 越大雾越重：beta↑, brightness↓
     brightness_score = 1 - np.clip(brightness_norm, 0, 1)
@@ -98,7 +98,7 @@ if __name__ == "__main__":
             for i in range(1, args.num + 1):
                 fog_img = add_fog(
                     original_image=img,
-                    beta_range=(0, 0.08),
+                    beta_range=(0.01, 0.04),
                     brightness_range=(0.6, 0.8)
                 )
                 out_name = f"{os.path.splitext(fname)[0]}_{i}{os.path.splitext(fname)[1]}"
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     #         for i in range(1, num + 1):
     #             fog_img, fog_score = add_fog(
     #                 original_image=img,
-    #                 beta_range=(0.01, 0.08),
+    #                 beta_range=(0.01, 0.04),
     #                 brightness_range=(0.6, 0.8)
     #             )
     #             out_path = os.path.join(output_dir, f"{fog_score:.4f}_" + fname)
@@ -137,7 +137,7 @@ if __name__ == "__main__":
     #         img = cv2.imread(img_path)
     #         fog_img, fog_score, fog_mask = add_fog(
     #             original_image=img,
-    #             beta_range=(0.01, 0.08),
+    #             beta_range=(0.01, 0.04),
     #             brightness_range=(0.6, 0.8),
     #             return_mask=True
     #         )
