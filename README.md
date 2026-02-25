@@ -136,6 +136,15 @@ python rain_removing_model/test_PReNet.py --data_dir ./datasets/DerainDataset/te
 python snow_removing_model/test.py --data_dir ./datasets/DesnowDataset/test --test_model ./snow_removing_model/weights/best.pkl
 ```
 
+### 5.4 行人重识别系统集成
+
+在完成去雾、去雨和去雪模型的训练和测试后，可以将这些模型集成到行人重识别系统中。具体步骤如下：
+1. 将训练好的去雾、去雨和去雪模型的权重文件保存在 `weights` 文件夹中。
+2. 在复杂天气图像修复工作台中，加载这些预训练模型，并使用它们对输入图像/视频进行预处理。
+3. 将预处理后的图像/视频输入到行人重识别工作台中进行识别。
+4. 在行人重识别工作台中，上传查询视频后，可以选择目标行人，接着上传检索视频，系统将自动进行检索并返回结果。
+
+
 ## 6. 结果
 
 测试结果（包括去雾、去雨和去雪后的图像）将保存在相应模型的 `results` 文件夹中。
