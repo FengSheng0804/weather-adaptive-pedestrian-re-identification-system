@@ -72,21 +72,18 @@ datasets/
 ### 5. PersonReIDDataset (行人重识别数据集)
 
 *   用于训练和评估行人重识别模型。
-*   包含 Market-1501、DukeMTMC-reID 和 CUHK03 三个子数据集。
+*   由 Market-1501 子数据集制作而成。
 *   每个子数据集包含训练集、查询集和图库。
-*   结构如下:
-```
-└── person_reid_dataset
-    ├── Market-1501
-    │   ├── bounding_box_train
-    │   ├── bounding_box_test
-    │   └── query
-    ├── DukeMTMC-reID
-    │   ├── bounding_box_train
-    │   ├── bounding_box_test
-    │   └── query
-    └── CUHK03
-        ├── detected
-        ├── labeled
-        └── query
-```
+
+#### 数据集结构:
+- bounding_box_test 是测试集，包括 19732 张图片。
+- bounding_box_train 是训练集，包括 12936 张图片。
+- gt_bbox 是手工标注的训练集和测试集图片，包括 25259 张图片，用来区分 “good” “junk” 和 “distractors” 图片。
+- query 是待查找的图片集，在 bounding_box_test 中实现查找。这些图片是手动绘制生成的。而 gallery 是通过 DPM 检测器生成的。
+- gt_query 是一些 Matlab 格式的文件，里面记录了 “good” 和 “junk” 图片的索引，主要被用来评估模型。
+#### 数据集命名规则
+- 0012 是行人 ID，Market 1501 有 1501 个行人，故行人 ID 范围为 0001-1501
+- c4 是摄像头编号(camera 4)，表明图片采集自第4个摄像头，一共有 6 个摄像头
+- s1 是视频的第一个片段(sequece1)，一个视频包含若干个片段
+- 000826 是视频的第 826 帧图片，表明行人出现在该帧图片中
+- 01 代表第 826 帧图片上的第一个检测框，DPM 检测器可能在一帧图片上生成多个检测框

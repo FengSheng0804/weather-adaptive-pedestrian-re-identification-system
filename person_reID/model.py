@@ -97,7 +97,7 @@ class ft_net_dense(nn.Module):
         super().__init__()
         # 加载本地的预训练模型
         model_ft = models.densenet121(pretrained=False)
-        state_dict = torch.load('./weights/DenseNet121/densenet121-a639ec97.pth')
+        state_dict = torch.load('./person_reID/weights/DenseNet121/densenet121-a639ec97.pth')
         # 修复densenet的key mismatch问题(由于pytorch版本更新导致的)
         pattern = re.compile(r'^(.*denselayer\d+\.(?:norm|conv))\.((?:[12])\.(?:weight|bias|running_mean|running_var))$')
         for key in list(state_dict.keys()):
@@ -152,13 +152,13 @@ class ft_net_middle(nn.Module):
 
 # Part Model proposed in Yifan Sun etal. (2018)
 class PCB(nn.Module):
-    def __init__(self, class_num ):
+    def __init__(self, class_num):
         super(PCB, self).__init__()
 
         self.part = 6 # We cut the pool5 to 6 parts
         # 加载本地的预训练模型
         model_ft = models.resnet50(pretrained=False)
-        state_dict = torch.load('./weights/PCB/resnet50-0676ba61.pth')
+        state_dict = torch.load('./person_reID/weights/PCB/resnet50-0676ba61.pth')
         model_ft.load_state_dict(state_dict)
         self.model = model_ft
         self.avgpool = nn.AdaptiveAvgPool2d((self.part,1))
