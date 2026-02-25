@@ -131,6 +131,9 @@ def main(args):
             
             # 保存图片
             for i in range(final_out.size(0)):
+                # 保存输入图像
+                input_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_input.jpg")
+                save_image(inputs[i, :, :h, :w], input_path)
                 # 保存各专家输出
                 defog_path = os.path.join(args.save_dir, f"{img_names[i].split('.')[0]}_defog.jpg")
                 save_image(defog_output[i], defog_path)

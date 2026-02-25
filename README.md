@@ -34,7 +34,7 @@
 
 ## 3. 数据集
 
-本项目使用了以下两个数据集进行模型的训练和评估：
+本项目使用了以下四个数据集进行模型的训练和评估：
 
 *   **DefogDataset**: 用于训练和测试去雾模型。
     *   `train/foggy_image`: 训练用带雾图像。
@@ -46,6 +46,16 @@
     *   `train/ground_truth`: 训练用无雨清晰图像。
     *   `test/rainy_image`: 测试用带雨图像。
     *   `test/ground_truth`: 测试用无雨清晰图像。
+*   **DesnowDataset**: 用于训练和测试去雪模型。
+    *   `train/snowy_image`: 训练用带雪图像。
+    *   `train/ground_truth`: 训练用无雪清晰图像。
+    *   `test/snowy_image`: 测试用带雪图像。
+    *   `test/ground_truth`: 测试用无雪清晰图像。
+*   **MoEDataset**: 用于训练和测试MoE模型。
+    *   `train/1`: 单一天气场景（`fog`, `rain`, `snow`），每个子文件夹包含带有天气效果的图像、对应的清晰图像（ground_truth）、掩码（mask）及天气强度分数（scores.txt）。
+    *   `train/2`: 两种天气叠加场景（`fog_rain`, `fog_snow`, `rain_snow`），结构同上。
+    *   `train/3`: 三种天气叠加场景（`fog_rain_snow`），结构同上。
+    *   `test`: 测试数据集，包含 `weather_image`（天气图像）和 `ground_truth`（清晰图像）。
 
 ## 4. 模型
 

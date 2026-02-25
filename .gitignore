@@ -3,6 +3,7 @@ datasets/DerainDataset/
 datasets/DefogDataset/
 datasets/DesnowDataset/
 datasets/MoEDataset/
+datasets/PersonReIDDataset/
 
 # 删除测试结果
 fog_removing_model/results/
@@ -12,6 +13,12 @@ weather_removing_model/results/
 
 # 删除模型权重文件
 fog_removing_model/weights/best_before_reparam.pk
+fog_removing_model/weights/best_after_reparam.pk
+rain_removing_model/weights/best.pth
+snow_removing_model/weights/best.pkl
+weather_removing_model/weights/*
+yolo_model/weights/yolo11s.pt
+person_reID/weights/*
 
 # 删除python编译文件
 **/__pycache__/
