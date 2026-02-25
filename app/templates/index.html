@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}首页 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block content %}
+<div class="jumbotron text-center mt-5">
+    <h1 class="display-4">复杂天气环境下的行人再识别系统</h1>
+    <p class="lead">基于MoE架构的图像修复与YOLOv11+ReID的行人再识别系统</p>
+    <hr class="my-4">
+    <p>本系统提供在雨、雪、雾等复杂天气条件下的视频图像修复，并支持高精度的行人目标检测与再识别。</p>
+    <a class="btn btn-primary btn-lg" href="{{ url_for('auth.login') }}" role="button">立即登录</a>
+    <a class="btn btn-outline-secondary btn-lg" href="{{ url_for('auth.register') }}" role="button">注册账号</a>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-cloud-sun fs-1 text-primary"></i>
+                <h3 class="card-title mt-3">复杂天气图像修复</h3>
+                <p class="card-text">采用MoE架构，自动识别并去除视频中的雨、雪、雾等天气干扰，还原清晰图像。</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <i class="bi bi-person-bounding-box fs-1 text-success"></i>
+                <h3 class="card-title mt-3">高精度行人再识别</h3>
+                <p class="card-text">结合YOLOv11目标检测与先进ReID模型，在海量视频中快速准确定位目标行人。</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

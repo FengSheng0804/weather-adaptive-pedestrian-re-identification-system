@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}我的视频库 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>我的视频库</h2>
+        <p class="text-muted">管理您上传的查询视频、检索视频以及天气修复视频。</p>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-4" id="videoTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="reid-tab" data-bs-toggle="tab" data-bs-target="#reid" type="button"
+            role="tab" aria-controls="reid" aria-selected="true">行人检索视频</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="weather-tab" data-bs-toggle="tab" data-bs-target="#weather" type="button"
+            role="tab" aria-controls="weather" aria-selected="false">天气修复视频</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="videoTabsContent">
+    <!-- 行人检索视频 -->
+    <div class="tab-pane fade show active" id="reid" role="tabpanel" aria-labelledby="reid-tab">
+        <div class="row">
+            {% if videos.items %}
+            {% for video in videos.items %}
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 text-truncate" title="{{ video.query_video_path }}">查询: {{
+                            video.query_video_path }}</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-6 text-center">
+                                <img src="{{ url_for('static', filename='output/reid/images/' + video.target_person_image) }}"
+                                    class="img-fluid rounded" alt="目标行人" style="max-height: 100px; object-fit: cover;">
+                                <p class="small text-muted mt-1">目标行人</p>
+                            </div>
+                            <div class="col-6 text-center">
+                                <video
+                                    src="{{ url_for('static', filename='output/reid/videos/' + video.result_video_path) }}"
+                                    class="img-fluid rounded" style="max-height: 100px; object-fit: cover;" autoplay
+                                    loop muted playsinline></video>
+                                <p class="small text-muted mt-1 text-truncate" title="{{ video.gallery_video_path }}">
+                                    检索: {{ video.gallery_video_path }}</p>
+                            </div>
+                        </div>
+                        <p class="card-text small text-muted mb-1">
+                            <i class="bi bi-calendar3"></i> {{ video.created_at|beijing_time }}
+                        </p>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
+                        <a href="{{ url_for('static', filename='output/reid/videos/' + video.result_video_path) }}"
+                            class="btn btn-sm btn-outline-primary" target="_blank">查看结果视频</a>
+                        <a href="{{ url_for('static', filename='output/reid/videos/' + video.result_video_path) }}"
+                            class="btn btn-sm btn-outline-success" download>下载</a>
+                        <button class="btn btn-sm btn-outline-danger delete-btn" data-id="{{ video.id }}"
+                            data-type="video">删除</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="col-md-12 text-center my-5">
+                <i class="bi bi-camera-video fs-1 text-muted"></i>
+                <p class="mt-3 text-muted">您的行人检索视频库空空如也，快去<a href="{{ url_for('reid.workbench') }}">行人检索工作台</a>处理一些视频吧！
+                </p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if videos.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                <li class="page-item {% if not videos.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('user.videos', page=videos.prev_num) }}">上一页</a>
+                </li>
+                {% for page_num in videos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                {% if page_num %}
+                <li class="page-item {% if page_num == videos.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('user.videos', page=page_num) }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                {% endfor %}
+                <li class="page-item {% if not videos.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('user.videos', page=videos.next_num) }}">下一页</a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+
+    <!-- 天气修复视频 -->
+    <div class="tab-pane fade" id="weather" role="tabpanel" aria-labelledby="weather-tab">
+        <div class="row">
+            {% if weather_videos.items %}
+            {% for video in weather_videos.items %}
+            <div class="col-md-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0 text-truncate" title="{{ video.original_path }}">原视频: {{ video.original_path }}
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-12 text-center">
+                                <div class="comparison-container"
+                                    style="height: 150px; position: relative; overflow: hidden; cursor: ew-resize;">
+                                    <video
+                                        src="{{ url_for('static', filename='output/restored/videos/' + video.restored_path) }}"
+                                        class="img-fluid rounded"
+                                        style="height: 100%; width: 100%; object-fit: cover; position: absolute; top: 0; left: 0;"
+                                        autoplay loop muted playsinline></video>
+                                    <div class="comparison-overlay"
+                                        style="position: absolute; top: 0; left: 0; width: 50%; height: 100%; overflow: hidden; border-right: 2px solid white;">
+                                        <video
+                                            src="{{ url_for('static', filename='uploads/videos/' + video.original_path) }}"
+                                            style="height: 100%; width: auto; max-width: none;" autoplay loop muted
+                                            playsinline></video>
+                                    </div>
+                                    <div class="comparison-slider"
+                                        style="position: absolute; top: 0; left: 50%; width: 40px; height: 100%; margin-left: -20px; background-color: transparent; z-index: 10;">
+                                        <div
+                                            style="position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; margin-top: -15px; margin-left: -15px; background-color: white; border-radius: 50%; box-shadow: 0 0 5px rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #333;">
+                                            &lt;&gt;</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="card-text small text-muted mb-1">
+                            <i class="bi bi-calendar3"></i> {{ video.created_at|beijing_time }}
+                        </p>
+                        <p class="card-text small text-muted mb-1">
+                            <i class="bi bi-clock"></i> 耗时: {{ "%.2f"|format(video.processing_time) }}s
+                        </p>
+                    </div>
+                    <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
+                        <a href="{{ url_for('static', filename='output/restored/videos/' + video.restored_path) }}"
+                            class="btn btn-sm btn-outline-primary" target="_blank">查看结果视频</a>
+                        <a href="{{ url_for('static', filename='output/restored/videos/' + video.restored_path) }}"
+                            class="btn btn-sm btn-outline-success" download>下载</a>
+                        <button class="btn btn-sm btn-outline-danger delete-btn" data-id="{{ video.id }}"
+                            data-type="image">删除</button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="col-md-12 text-center my-5">
+                <i class="bi bi-cloud-sun fs-1 text-muted"></i>
+                <p class="mt-3 text-muted">您的天气修复视频库空空如也，快去<a
+                        href="{{ url_for('weather.workbench') }}">天气修复工作台</a>处理一些视频吧！</p>
+            </div>
+            {% endif %}
+        </div>
+
+        {% if weather_videos.pages > 1 %}
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                <li class="page-item {% if not weather_videos.has_prev %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('user.videos', page=weather_videos.prev_num) }}">上一页</a>
+                </li>
+                {% for page_num in weather_videos.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2)
+                %}
+                {% if page_num %}
+                <li class="page-item {% if page_num == weather_videos.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('user.videos', page=page_num) }}">{{ page_num }}</a>
+                </li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+                {% endif %}
+                {% endfor %}
+                <li class="page-item {% if not weather_videos.has_next %}disabled{% endif %}">
+                    <a class="page-link" href="{{ url_for('user.videos', page=weather_videos.next_num) }}">下一页</a>
+                </li>
+            </ul>
+        </nav>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-dark border-0">
+            <div class="modal-body p-0 position-relative text-center">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                <video src="" class="w-100 rounded shadow-lg" id="modalVideo" controls autoplay style="max-height: 90vh;"></video>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function () {
+        const videoModal = new bootstrap.Modal(document.getElementById('videoModal'));
+        const modalVideo = document.getElementById('modalVideo');
+
+        document.getElementById('videoModal').addEventListener('hidden.bs.modal', function () {
+            modalVideo.pause();
+            modalVideo.src = "";
+        });
+
+        function openVideoModal(src) {
+            modalVideo.src = src;
+            videoModal.show();
+        }
+
+        // Bind to preview buttons
+        $('.btn-outline-primary').click(function(e) {
+            e.preventDefault();
+            openVideoModal($(this).attr('href'));
+        });
+
+        // Double click on comparison container in weather tab
+        $('.comparison-container').on('dblclick', function() {
+             const src = $(this).find('video').first().attr('src');
+             openVideoModal(src);
+        });
+
+        // Click on result video in ReID tab
+        $('video').not('#modalVideo, .comparison-container video').click(function() {
+             // If it's the small preview video, open modal
+             if($(this).closest('.card-body').length > 0) {
+                 openVideoModal($(this).attr('src'));
+             }
+        });
+
+        // Comparison slider logic
+        $('.comparison-container').each(function () {
+            const container = $(this);
+            const overlay = container.find('.comparison-overlay');
+            const slider = container.find('.comparison-slider');
+            let isDown = false;
+
+            function moveSlider(e) {
+                if (!isDown) return;
+                const rect = container[0].getBoundingClientRect();
+                let x = (e.pageX || e.originalEvent.touches[0].pageX) - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const percent = (x / rect.width) * 100;
+                overlay.css('width', percent + '%');
+                slider.css('left', percent + '%');
+            }
+
+            container.on('mousedown touchstart', function (e) {
+                isDown = true;
+                moveSlider(e);
+            });
+
+            $(window).on('mouseup touchend', function () {
+                isDown = false;
+            });
+
+            $(window).on('mousemove touchmove', function (e) {
+                moveSlider(e);
+            });
+        });
+
+        $('.delete-btn').click(function () {
+            if (!confirm('确定要删除这条记录吗？')) {
+                return;
+            }
+
+            const btn = $(this);
+            const id = btn.data('id');
+            const type = btn.data('type'); // 'video' for ReID, 'image' for Weather (since it's stored in ImageRecord)
+
+            const url = type === 'video' ? `/user/delete_video/${id}` : `/user/delete_image/${id}`;
+
+            $.ajax({
+                url: url,
+                type: 'POST',
+                success: function (response) {
+                    if (response.success) {
+                        // 移除对应的卡片
+                        btn.closest('.col-md-4').fadeOut(300, function () {
+                            $(this).remove();
+                            // 如果页面上没有卡片了，可以刷新页面显示空状态
+                            if ($('.col-md-4').length === 0) {
+                                location.reload();
+                            }
+                        });
+                    } else {
+                        alert('删除失败：' + response.message);
+                    }
+                },
+                error: function () {
+                    alert('删除请求失败，请稍后重试');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

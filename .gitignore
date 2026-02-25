@@ -25,5 +25,12 @@ person_reID/weights/*
 **/__pycache__/
 **/*.pyc
 
+# 删除用户上传的文件和生成的结果
+app/static/uploads/*
+app/static/output/*
+
+# 删除数据库文件
+apris.db
+
 # 删除输出文件
 person_reID/result/

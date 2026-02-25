@@ -1,0 +1,872 @@
+﻿{% extends "base.html" %}
+
+{% block title %}行人再识别 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .card-header {
+        background-color: #fff !important;
+        border-bottom: 2px solid #f0f2f5;
+        font-weight: 600;
+        padding: 1.25rem;
+        color: #333 !important;
+    }
+
+    .step-badge {
+        background: #0d6efd;
+        color: white;
+        border-radius: 50%;
+        width: 28px;
+        height: 28px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        margin-right: 10px;
+    }
+
+    .video-container {
+        position: relative;
+        width: 100%;
+        background: #1a1a1a;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: 1px solid #333;
+    }
+
+    .video-container video {
+        width: 100%;
+        display: block;
+    }
+
+    .bbox-overlay {
+        position: absolute;
+        border: 2px solid #ff3e3e;
+        background: rgba(255, 62, 62, 0.2);
+        display: none;
+        pointer-events: none;
+        box-shadow: 0 0 8px rgba(255, 62, 62, 0.6);
+        z-index: 10;
+    }
+
+    .result-card {
+        border: 1px solid #eee;
+        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    }
+
+    .result-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        border-color: #0d6efd;
+    }
+
+    .result-score {
+        font-weight: 700;
+        font-size: 1.2rem;
+        background: linear-gradient(45deg, #198754, #20c997);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .upload-btn-wrapper {
+        position: relative;
+        overflow: hidden;
+        display: inline-block;
+        width: 100%;
+    }
+
+    .btn-upload {
+        border: 2px dashed #dee2e6;
+        color: #6c757d;
+        background-color: white;
+        padding: 20px 20px;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s;
+        width: 100%;
+        text-align: center;
+    }
+
+    .btn-upload:hover {
+        border-color: #0d6efd;
+        color: #0d6efd;
+        background-color: #f8f9fa;
+    }
+
+    .btn-upload:active {
+        transform: scale(0.99);
+    }
+
+    /* Custom scrollbar for results */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+
+    .cursor-pointer {
+        cursor: pointer;
+    }
+
+    .result-img-container:hover .overflow-hidden {
+        border-color: #0d6efd !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h2>行人再识别工作台</h2>
+            <p class="text-muted">上传查询视频和检索视频，使用YOLOv11+ReID模型快速定位目标行人。</p>
+        </div>
+        <button id="newTaskBtn" class="btn btn-outline-primary">
+            <i class="bi bi-plus-circle"></i> 新建任务
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex align-items-center">
+                <span class="step-badge">1</span>
+                <span>上传查询视频并选择目标</span>
+            </div>
+            <div class="card-body p-4">
+                <div class="upload-btn-wrapper mb-3">
+                    <button class="btn btn-upload" onclick="document.getElementById('queryVideoInput').click()">
+                        <i class="bi bi-person-video2 fs-4 d-block mb-2"></i>
+                        点击上传查询视频 (Query Video)
+                    </button>
+                    <input type="file" id="queryVideoInput" class="form-control d-none" accept="video/*">
+                </div>
+
+                <div class="video-container mb-3" id="queryVideoContainer"
+                    style="display: none; min-height: 240px; background: #000; display: flex; align-items: center; justify-content: center;">
+                    <video id="queryVideo" controls preload="auto"
+                        style="max-height: 400px; width: auto; max-width: 100%;"></video>
+                    <div id="bboxOverlay" class="bbox-overlay"></div>
+                </div>
+
+                <div id="selectionControls" style="display: none;" class="bg-light p-3 rounded-3">
+                    <p class="text-dark small fw-bold mb-2"><i class="bi bi-info-circle me-1"></i>
+                        操作提示：暂停视频，点击"开始框选"，然后拖动鼠标框选目标行人</p>
+                    <div class="d-flex gap-2">
+                        <button id="startSelectBtn" class="btn btn-outline-secondary flex-grow-1"><i
+                                class="bi bi-bounding-box-circles me-1"></i> 开始框选</button>
+                        <button id="confirmTargetBtn" class="btn btn-outline-primary flex-grow-1" disabled><i
+                                class="bi bi-check-lg me-1"></i> 确认目标</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 col-md-12 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header d-flex align-items-center">
+                <span class="step-badge">2</span>
+                <span>上传检索视频并处理</span>
+            </div>
+            <div class="card-body p-4">
+                <div class="upload-btn-wrapper mb-3">
+                    <button class="btn btn-upload" onclick="document.getElementById('galleryVideoInput').click()">
+                        <i class="bi bi-collection-play fs-4 d-block mb-2"></i>
+                        点击上传库视检索频 (Gallery Video)
+                    </button>
+                    <input type="file" id="galleryVideoInput" class="form-control d-none" accept="video/*">
+                </div>
+
+                <div class="video-container mb-3" id="galleryVideoContainer"
+                    style="display: none; min-height: 240px; background: #000; display: flex; align-items: center; justify-content: center;">
+                    <video id="galleryVideo" controls preload="auto"
+                        style="max-height: 400px; width: auto; max-width: 100%;"></video>
+                </div>
+
+                <button id="processBtn" class="btn btn-success w-100 py-2 fw-bold shadow-sm" style="margin-top: auto;"
+                    disabled>
+                    <i class="bi bi-search me-2"></i> 开始检索
+                </button>
+                <div id="processProgressContainer" class="mt-4" style="display: none;">
+                    <div class="card bg-light border-0 mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title text-muted mb-3"><i class="bi bi-cpu me-2"></i>处理进度</h6>
+                            <div class="progress mb-2" style="height: 10px; border-radius: 5px;">
+                                <div id="processProgressBar"
+                                    class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                                    role="progressbar" style="width: 0%"></div>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="text-muted small">正在分析视频帧...</span>
+                                <span class="text-muted small fw-bold" id="processProgressText">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="livePreviewContainer" class="mb-3" style="display:none;">
+                        <div class="card border-0 shadow-sm"
+                            style="overflow: hidden; border-radius: 12px; background: #000;">
+                            <div
+                                class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center border-0">
+                                <span class="small"><i class="bi bi-eye me-2"></i>实时检索画面</span>
+                                <span
+                                    class="badge bg-danger animate__animated animate__pulse animate__infinite">LIVE</span>
+                            </div>
+                            <div class="position-relative"
+                                style="min-height: 200px; display: flex; align-items: center; justify-content: center; background-image: url('data:image/svg+xml,...');">
+                                <img id="livePreviewImage"
+                                    style="width: 100%; height: auto; max-height: 350px; object-fit: contain; display: block;">
+                                <div class="position-absolute top-50 start-50 translate-middle text-white-50"
+                                    id="livePreviewPlaceholder" style="display: none;">
+                                    <div class="spinner-border text-light" role="status"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-muted small text-center mt-2 mb-0">
+                            <i class="bi bi-info-circle me-1"></i>绿色边框表示匹配目标，红色边框表示未匹配
+                        </p>
+                    </div>
+
+                    <button id="cancelBtn" class="btn btn-outline-danger w-100 py-2 border-2 fw-bold">
+                        <i class="bi bi-stop-circle me-2"></i>终止当前任务
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row" id="resultsSection" style="display: none;">
+    <div class="col-md-12">
+        <div class="card shadow-sm mt-2">
+            <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white"
+                style="background:#343a40 !important; color:white !important;">
+                <h5 class="mb-0 text-white"><i class="bi bi-list-stars me-2"></i> 检索结果</h5>
+                <button id="downloadBtn" class="btn btn-sm btn-outline-light"><i class="bi bi-download me-1"></i>
+                    下载结果视频</button>
+            </div>
+            <div class="card-body p-4">
+                <h6 class="mb-3 border-start border-4 border-primary ps-2 fw-bold text-dark">Top-K 匹配结果</h6>
+                <div class="row g-3" id="topKResults">
+                    <!-- Results will be injected here -->
+                </div>
+
+                <hr class="my-4">
+                <h6 class="mb-3 border-start border-4 border-success ps-2 fw-bold text-dark">结果视频预览</h6>
+                <div class="video-container" style="background: #000;">
+                    <video id="resultVideo" controls preload="auto"
+                        style="width: 100%; height: auto; display: block;"></video>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function () {
+        let queryVideoUrl = '';
+        let galleryVideoUrl = '';
+        let targetBbox = null;
+        let progressInterval = null;
+        let currentTaskId = sessionStorage.getItem('{{ current_user.id }}_reidTaskId');
+
+        function parseTimeStr(timeStr) {
+            if (!timeStr) return 0;
+            const parts = timeStr.split(':');
+            return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+        }
+
+        /* ─── helpers ────────────────────────────────────────────── */
+
+        function clearState() {
+            sessionStorage.removeItem('{{ current_user.id }}_reidTaskId');
+            currentTaskId = null;
+            $('#livePreviewImage').attr('src', '');
+            $('#livePreviewContainer').hide();
+        }
+
+        function clearAllState() {
+            sessionStorage.removeItem('{{ current_user.id }}_reidTaskId');
+            sessionStorage.removeItem('{{ current_user.id }}_reidQueryVideoUrl');
+            sessionStorage.removeItem('{{ current_user.id }}_reidGalleryVideoUrl');
+            sessionStorage.removeItem('{{ current_user.id }}_reidTargetBbox');
+            sessionStorage.removeItem('{{ current_user.id }}_reidResultsState');
+            currentTaskId = null;
+        }
+
+        /* Lock / unlock upload inputs, select buttons, video controls */
+        function toggleControls(disabled) {
+            $('#queryVideoInput').prop('disabled', disabled);
+            $('#galleryVideoInput').prop('disabled', disabled);
+            $('#startSelectBtn').prop('disabled', disabled);
+            if (disabled) {
+                $('#confirmTargetBtn').prop('disabled', true);
+                $('#queryVideo').prop('controls', false).css('pointer-events', 'none');
+                $('#galleryVideo').prop('controls', false).css('pointer-events', 'none');
+            } else {
+                $('#queryVideo').prop('controls', true).css('pointer-events', 'auto');
+                $('#galleryVideo').prop('controls', true).css('pointer-events', 'auto');
+                if (targetBbox) {
+                    $('#confirmTargetBtn').prop('disabled', false);
+                }
+            }
+        }
+
+        function checkReady() {
+            if (queryVideoUrl && galleryVideoUrl && targetBbox && $('#confirmTargetBtn').hasClass('btn-primary')) {
+                $('#processBtn').prop('disabled', false);
+            }
+        }
+
+        /* ─── New Task Button ───────────────────────────────────── */
+
+        $('#newTaskBtn').click(function () {
+            if (confirm('确定要新建任务吗？当前内容将被清空。')) {
+                clearAllState();
+                location.reload();
+            }
+        });
+
+        /* ─── Video Upload ──────────────────────────────────────── */
+
+        $('#queryVideoInput').change(function () {
+            if (this.files.length > 0) {
+                $('#queryVideoContainer').show();
+                $('#selectionControls').show();
+                uploadVideo(this.files[0], 'query');
+            }
+        });
+
+        $('#galleryVideoInput').change(function () {
+            if (this.files.length > 0) {
+                $('#galleryVideoContainer').show();
+                uploadVideo(this.files[0], 'gallery');
+            }
+        });
+
+        function uploadVideo(file, type) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            // Immediate local preview
+            const objectUrl = URL.createObjectURL(file);
+            if (type === 'query') {
+                const v = $('#queryVideo')[0]; v.src = objectUrl; v.load();
+            } else {
+                const v = $('#galleryVideo')[0]; v.src = objectUrl; v.load();
+            }
+
+            $.ajax({
+                url: "{{ url_for('reid.upload') }}",
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (response) {
+                    if (type === 'query') {
+                        queryVideoUrl = response.filename;
+                        sessionStorage.setItem('{{ current_user.id }}_reidQueryVideoUrl', queryVideoUrl);
+                    } else {
+                        galleryVideoUrl = response.filename;
+                        sessionStorage.setItem('{{ current_user.id }}_reidGalleryVideoUrl', galleryVideoUrl);
+                    }
+
+                    // Reset process button state
+                    $('#processBtn').html('<i class="bi bi-search me-2"></i> 开始检索');
+                    
+                    checkReady();
+                },
+                error: function () { alert('视频上传失败'); }
+            });
+        }
+
+        /* ─── Bounding Box Drawing ──────────────────────────────── */
+
+        const container = document.getElementById('queryVideoContainer');
+        const overlay = document.getElementById('bboxOverlay');
+        const videoElement = document.getElementById('queryVideo'); // Get the video element
+        let isDrawing = false;
+        let isSelectingMode = false;
+        let startX, startY;
+
+        $('#startSelectBtn').click(function () {
+            const video = $('#queryVideo')[0];
+            video.pause();
+            isSelectingMode = true;
+            $(this).removeClass('btn-outline-secondary').addClass('btn-secondary').text('正在框选...');
+            $('#queryVideoContainer').css('cursor', 'crosshair');
+            $(video).css('pointer-events', 'none');
+        });
+
+        // Helper to get coordinates relative to the VIDEO element, not the container
+        function getRelativeCoords(e) {
+            const videoRect = videoElement.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+
+            // Calculate offset of video within container (e.g., if centered)
+            const videoOffsetX = videoRect.left - containerRect.left;
+            const videoOffsetY = videoRect.top - containerRect.top;
+
+            // Mouse position relative to container
+            const mouseX = e.clientX - containerRect.left;
+            const mouseY = e.clientY - containerRect.top;
+
+            // Mouse position relative to video
+            let x = mouseX - videoOffsetX;
+            let y = mouseY - videoOffsetY;
+
+            // Clamp to video boundaries
+            x = Math.max(0, Math.min(x, videoRect.width));
+            y = Math.max(0, Math.min(y, videoRect.height));
+
+            return { x, y, videoRect, videoOffsetX, videoOffsetY };
+        }
+
+        container.addEventListener('mousedown', (e) => {
+            if (!isSelectingMode) return;
+            isDrawing = true;
+
+            const coords = getRelativeCoords(e);
+            startX = coords.x;
+            startY = coords.y;
+
+            // Draw relative to container (add offset back)
+            overlay.style.left = (startX + coords.videoOffsetX) + 'px';
+            overlay.style.top = (startY + coords.videoOffsetY) + 'px';
+            overlay.style.width = '0px';
+            overlay.style.height = '0px';
+            overlay.style.display = 'block';
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+
+            const coords = getRelativeCoords(e);
+
+            // coords.x/y are clamped to video boundaries
+            const currentX = coords.x;
+            const currentY = coords.y;
+
+            // Calculate width/height relative to start point
+            const x = Math.min(startX, currentX);
+            const y = Math.min(startY, currentY);
+            const w = Math.abs(currentX - startX);
+            const h = Math.abs(currentY - startY);
+
+            // Apply offset to position the overlay correctly within the container
+            overlay.style.left = (x + coords.videoOffsetX) + 'px';
+            overlay.style.top = (y + coords.videoOffsetY) + 'px';
+            overlay.style.width = w + 'px';
+            overlay.style.height = h + 'px';
+        });
+
+        container.addEventListener('mouseup', (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            isSelectingMode = false;
+            $('#startSelectBtn').removeClass('btn-secondary').addClass('btn-outline-secondary').text('重新框选');
+            $('#queryVideoContainer').css('cursor', 'default');
+            $('#queryVideo').css('pointer-events', 'auto');
+            $('#confirmTargetBtn').prop('disabled', false);
+
+            const coords = getRelativeCoords(e);
+            const endX = coords.x;
+            const endY = coords.y;
+
+            // Calculate normalized coordinates explicitly based on video dimensions
+            // Backend expects (x, y, w, h) normalized to [0, 1] relative to video frame
+            targetBbox = {
+                x: Math.min(startX, endX) / coords.videoRect.width,
+                y: Math.min(startY, endY) / coords.videoRect.height,
+                w: Math.abs(endX - startX) / coords.videoRect.width,
+                h: Math.abs(endY - startY) / coords.videoRect.height,
+                time: videoElement.currentTime
+            };
+            checkReady();
+        });
+
+        $('#confirmTargetBtn').click(function () {
+            if (!targetBbox) { alert('请先在视频中框选目标行人'); return; }
+            $(this).removeClass('btn-outline-primary').addClass('btn-primary').text('目标已确认');
+            sessionStorage.setItem('{{ current_user.id }}_reidTargetBbox', JSON.stringify(targetBbox));
+            checkReady();
+        });
+
+        /* ─── Restore sessionStorage state on page load ──────────── */
+
+        function restoreBboxOverlay(videoEl) {
+            videoEl.addEventListener('loadedmetadata', function () {
+                const videoRect = videoElement.getBoundingClientRect();
+                const containerRect = container.getBoundingClientRect();
+                const videoOffsetX = videoRect.left - containerRect.left;
+                const videoOffsetY = videoRect.top - containerRect.top;
+
+                overlay.style.left = (targetBbox.x * videoRect.width + videoOffsetX) + 'px';
+                overlay.style.top = (targetBbox.y * videoRect.height + videoOffsetY) + 'px';
+                overlay.style.width = (targetBbox.w * videoRect.width) + 'px';
+                overlay.style.height = (targetBbox.h * videoRect.height) + 'px';
+                overlay.style.display = 'block';
+                if (targetBbox.time) videoEl.currentTime = targetBbox.time;
+            }, { once: true });
+        }
+
+        if (currentTaskId) {
+            queryVideoUrl = sessionStorage.getItem('{{ current_user.id }}_reidQueryVideoUrl') || '';
+            galleryVideoUrl = sessionStorage.getItem('{{ current_user.id }}_reidGalleryVideoUrl') || '';
+            targetBbox = JSON.parse(sessionStorage.getItem('{{ current_user.id }}_reidTargetBbox') || 'null');
+
+            if (queryVideoUrl && galleryVideoUrl && targetBbox) {
+                $('#queryVideoContainer').show();
+                $('#galleryVideoContainer').show();
+                $('#queryVideo')[0].src = "{{ url_for('static', filename='uploads/videos/') }}" + queryVideoUrl;
+                $('#galleryVideo')[0].src = "{{ url_for('static', filename='uploads/videos/') }}" + galleryVideoUrl;
+
+                $('#selectionControls').show();
+                $('#confirmTargetBtn').removeClass('btn-outline-primary').addClass('btn-primary')
+                    .text('目标已确认').prop('disabled', false);
+                restoreBboxOverlay($('#queryVideo')[0]);
+
+                $('#processBtn').hide();
+                $('#processProgressContainer').show();
+                $('#livePreviewContainer').show();
+                $('#livePreviewImage').attr('src', `/reid/video_feed/${currentTaskId}?t=${new Date().getTime()}`);
+                toggleControls(true);
+                startProgressPolling(currentTaskId);
+            } else {
+                clearState();
+            }
+        } else {
+            queryVideoUrl = sessionStorage.getItem('{{ current_user.id }}_reidQueryVideoUrl') || '';
+            galleryVideoUrl = sessionStorage.getItem('{{ current_user.id }}_reidGalleryVideoUrl') || '';
+            targetBbox = JSON.parse(sessionStorage.getItem('{{ current_user.id }}_reidTargetBbox') || 'null');
+
+            if (queryVideoUrl) {
+                $('#queryVideoContainer').show();
+                $('#selectionControls').show();
+                $('#queryVideo')[0].src = "{{ url_for('static', filename='uploads/videos/') }}" + queryVideoUrl;
+                if (targetBbox) {
+                    $('#confirmTargetBtn').removeClass('btn-outline-primary').addClass('btn-primary')
+                        .text('目标已确认').prop('disabled', false);
+                    restoreBboxOverlay($('#queryVideo')[0]);
+                }
+            }
+            if (galleryVideoUrl) {
+                $('#galleryVideoContainer').show();
+                $('#galleryVideo')[0].src = "{{ url_for('static', filename='uploads/videos/') }}" + galleryVideoUrl;
+            }
+            checkReady();
+        }
+
+        /* ─── Process Button ────────────────────────────────────── */
+
+        $('#processBtn').click(function () {
+            if ($(this).html().includes('处理完成')) return; // already done, do nothing
+
+            $(this).prop('disabled', true)
+                .html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...');
+            $('#processBtn').hide();
+            $('#processProgressContainer').show();
+            $('#livePreviewContainer').show(); // Show preview container
+            $('#processProgressBar').css('width', '0%').attr('aria-valuenow', 0);
+            $('#processProgressText').text('处理进度: 0%');
+            toggleControls(true);
+
+            sessionStorage.removeItem('{{ current_user.id }}_reidResultsState');
+            $('#resultsSection').hide();
+
+            $.ajax({
+                url: "{{ url_for('reid.create_task') }}",
+                type: 'POST',
+                success: function (response) {
+                    currentTaskId = response.task_id;
+                    sessionStorage.setItem('{{ current_user.id }}_reidTaskId', currentTaskId);
+                    sessionStorage.setItem('{{ current_user.id }}_reidQueryVideoUrl', queryVideoUrl);
+                    sessionStorage.setItem('{{ current_user.id }}_reidGalleryVideoUrl', galleryVideoUrl);
+                    sessionStorage.setItem('{{ current_user.id }}_reidTargetBbox', JSON.stringify(targetBbox));
+
+                    startProgressPolling(currentTaskId);
+
+                    // Start Live Stream
+                    $('#livePreviewImage').attr('src', `/reid/video_feed/${currentTaskId}?t=${new Date().getTime()}`);
+
+                    $.ajax({
+                        url: "{{ url_for('reid.process') }}",
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            query_video: queryVideoUrl,
+                            gallery_video: galleryVideoUrl,
+                            target_bbox: targetBbox,
+                            task_id: currentTaskId
+                        }),
+                        success: function (response) {
+                            clearInterval(progressInterval); // stop polling
+
+                            // Stop Live Stream
+                            $('#livePreviewImage').attr('src', '');
+                            $('#livePreviewContainer').hide();
+
+                            $('#processProgressContainer').hide();
+                            $('#processBtn').show().prop('disabled', true)
+                                .html('<i class="bi bi-check2"></i> 处理完成');
+
+                            $('#resultsSection').fadeIn();
+                            const topKContainer = $('#topKResults');
+                            topKContainer.empty();
+
+                            if (response.top_k && response.top_k.length > 0) {
+                                response.top_k.forEach((item, index) => {
+                                    const scorePercent = (item.score * 100).toFixed(1);
+                                    const rankClass = index === 0 ? "border-primary border-3" : "border-secondary";
+                                    const badgeClass = index === 0 ? "bg-primary text-white" : "bg-light text-dark border";
+
+                                    topKContainer.append(`
+                                        <div class="col-md-4 mb-3 animate__animated animate__fadeInUp" style="animation-delay: ${index * 0.1}s">
+                                            <div class="card result-card h-100 shadow-sm ${rankClass}">
+                                                <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex justify-content-between">
+                                                    <span class="badge bg-secondary">Rank ${index + 1}</span>
+                                                    <span class="badge ${item.score > 0.8 ? 'bg-success' : 'bg-warning text-dark'}">
+                                                        Confidence: ${scorePercent}%
+                                                    </span>
+                                                </div>
+                                                <div class="card-body text-center p-3">
+                                                    <div class="mb-3 position-relative d-inline-block w-100 cursor-pointer result-img-container" 
+                                                         onclick="const v = document.getElementById('resultVideo'); if (${item.seconds}) { v.currentTime = ${item.seconds}; } else { v.currentTime = parseTimeStr('${item.time}'); } v.pause(); v.scrollIntoView({behavior: 'smooth', block: 'center'});"
+                                                         title="点击跳转到对应帧: ${item.frame_index !== undefined ? item.frame_index : '未知'} (并暂停)">
+                                                        <div class="overflow-hidden d-flex align-items-center justify-content-center bg-light mx-auto" 
+                                                             style="width:100%; height:200px; border-radius: 8px; border: 2px solid ${index === 0 ? '#0d6efd' : '#e9ecef'}; transition: border-color 0.2s;">
+                                                            ${item.image_url ?
+                                            `<img src="{{ url_for('static', filename='') }}${item.image_url}" class="w-100 h-100" style="object-fit: contain;">` :
+                                            `<i class="bi bi-person-check-fill fs-1 ${index === 0 ? 'text-primary' : 'text-muted'}"></i>`
+                                        }
+                                                        </div>
+                                                    </div>
+                                                    <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+                                                        <div class="text-center">
+                                                            <div class="h5 fw-bold mb-0 text-primary">${scorePercent}%</div>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">相似度</small>
+                                                        </div>
+                                                        <div class="vr bg-secondary opacity-25"></div>
+                                                        <div class="text-center">
+                                                            <div class="text-dark fw-bold font-monospace small"><i class="bi bi-clock me-1"></i>${item.time}</div>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">出现时间</small>
+                                                        </div>
+                                                        <div class="vr bg-secondary opacity-25"></div>
+                                                        <div class="text-center">
+                                                            <div class="text-dark fw-bold font-monospace small"><i class="bi bi-film me-1"></i>${item.frame_index !== undefined ? item.frame_index : '-'}</div>
+                                                            <small class="text-muted" style="font-size: 0.75rem;">帧索引</small>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>`);
+                                });
+                            } else {
+                                topKContainer.html(`
+                                    <div class="col-12 text-center py-5">
+                                        <div class="text-muted mb-3"><i class="bi bi-search display-4"></i></div>
+                                        <h5 class="text-secondary">未找到符合阈值 (>65%) 的目标行人</h5>
+                                        <p class="small text-muted">请尝试调整输入视频或放宽检索条件</p>
+                                    </div>
+                                `);
+                            }
+
+                            if (response.result_video_url) {
+                                $('#resultVideo')[0].src = response.result_video_url;
+                                $('#resultVideo')[0].load();
+                            }
+
+                            sessionStorage.setItem('{{ current_user.id }}_reidResultsState', JSON.stringify({
+                                topK: response.top_k,
+                                resultVideoUrl: response.result_video_url
+                            }));
+                        },
+                        error: function (xhr) {
+                            clearState();
+                            clearInterval(progressInterval);
+                            toggleControls(false);
+                            $('#processProgressContainer').hide();
+                            $('#processBtn').show().prop('disabled', false).html('开始检索');
+                            if (xhr.responseJSON && xhr.responseJSON.error === 'Task cancelled') {
+                                alert('任务已终止');
+                            } else {
+                                alert('处理失败: ' + (xhr.responseJSON ? xhr.responseJSON.error : '未知错误'));
+                            }
+                        }
+                    });
+                },
+                error: function () {
+                    toggleControls(false);
+                    $('#processProgressContainer').hide();
+                    $('#processBtn').show().prop('disabled', false).html('开始检索');
+                    alert('创建任务失败');
+                }
+            });
+        });
+
+        /* ─── Progress Polling ──────────────────────────────────── */
+
+        function startProgressPolling(taskId) {
+            if (progressInterval) clearInterval(progressInterval);
+            progressInterval = setInterval(function () {
+                $.ajax({
+                    url: `/reid/progress/${taskId}`,
+                    type: 'GET',
+                    success: function (response) {
+                        if (response.status === 'cancelled') {
+                            clearInterval(progressInterval);
+                            clearState();
+                            toggleControls(false);
+                            $('#processProgressContainer').hide();
+                            $('#processBtn').show().prop('disabled', false).html('开始检索');
+                            return;
+                        }
+                        if (response.status === 'failed') {
+                            clearInterval(progressInterval);
+                            clearState();
+                            toggleControls(false);
+                            $('#processProgressContainer').hide();
+                            $('#processBtn').show().prop('disabled', false).html('开始检索');
+                            alert('任务失败或服务器已重启，请重新开始任务');
+                            return;
+                        }
+                        const progress = response.progress;
+                        if (response.status === 'completed' || (progress && progress >= 100)) {
+                            clearInterval(progressInterval);
+                            clearState();
+                            toggleControls(false);
+                            $('#processProgressBar').css('width', '100%').attr('aria-valuenow', 100);
+                            $('#processProgressText').text('处理进度: 100%');
+                            $('#processProgressContainer').hide();
+                            $('#processBtn').show().prop('disabled', true)
+                                .html('<i class="bi bi-check2"></i> 处理完成 (请在历史记录查看)');
+                            return;
+                        }
+                        $('#processProgressBar').css('width', progress + '%').attr('aria-valuenow', progress);
+                        $('#processProgressText').text(`处理进度: ${progress}%`);
+                    },
+                    error: function () {
+                        clearInterval(progressInterval);
+                        clearState();
+                        toggleControls(false);
+                        $('#processProgressContainer').hide();
+                        $('#processBtn').show().prop('disabled', false).html('开始检索');
+                        console.log('Task not found or server restarted');
+                    }
+                });
+            }, 1000);
+        }
+
+        /* ─── Cancel Button ─────────────────────────────────────── */
+
+        $('#cancelBtn').click(function () {
+            if (!currentTaskId) return;
+            if (!confirm('确定要终止当前任务吗？')) return;
+            const btn = $(this);
+            btn.prop('disabled', true).text('正在终止...');
+            $.ajax({
+                url: `/reid/cancel/${currentTaskId}`,
+                type: 'POST',
+                success: function () { btn.prop('disabled', false).text('终止任务'); },
+                error: function () {
+                    alert('终止任务失败');
+                    btn.prop('disabled', false).text('终止任务');
+                }
+            });
+        });
+
+        /* ─── Restore results from sessionStorage ────────────────── */
+
+        const savedResultsState = sessionStorage.getItem('{{ current_user.id }}_reidResultsState');
+        if (savedResultsState && !currentTaskId) {
+            const state = JSON.parse(savedResultsState);
+            if (state.topK && state.resultVideoUrl) {
+                $('#resultsSection').fadeIn();
+                const topKContainer = $('#topKResults');
+                topKContainer.empty();
+
+                if (state.topK && state.topK.length > 0) {
+                    state.topK.forEach((item, index) => {
+                        const scorePercent = (item.score * 100).toFixed(1);
+                        const rankClass = index === 0 ? "border-primary border-3" : "border-secondary";
+
+                        topKContainer.append(`
+                            <div class="col-md-4 mb-3 animate__animated animate__fadeInUp" style="animation-delay: ${index * 0.1}s">
+                                <div class="card result-card h-100 shadow-sm ${rankClass}">
+                                    <div class="card-header bg-transparent border-0 pt-3 pb-0 d-flex justify-content-between">
+                                        <span class="badge bg-secondary">Rank ${index + 1}</span>
+                                        <span class="badge ${item.score > 0.8 ? 'bg-success' : 'bg-warning text-dark'}">
+                                            Confidence: ${scorePercent}%
+                                        </span>
+                                    </div>
+                                    <div class="card-body text-center p-3">
+                                        <div class="mb-3 position-relative d-inline-block w-100 cursor-pointer result-img-container" 
+                                             onclick="const v = document.getElementById('resultVideo'); if (${item.seconds}) { v.currentTime = ${item.seconds}; } else { v.currentTime = parseTimeStr('${item.time}'); } v.pause(); v.scrollIntoView({behavior: 'smooth', block: 'center'});"
+                                             title="点击跳转到对应帧: ${item.frame_index !== undefined ? item.frame_index : '未知'} (并暂停)">
+                                            <div class="overflow-hidden d-flex align-items-center justify-content-center bg-light mx-auto" 
+                                                 style="width:100%; height:200px; border-radius: 8px; border: 2px solid ${index === 0 ? '#0d6efd' : '#e9ecef'}; transition: border-color 0.2s;">
+                                                ${item.image_url ?
+                                `<img src="{{ url_for('static', filename='') }}${item.image_url}" class="w-100 h-100" style="object-fit: contain;">` :
+                                `<i class="bi bi-person-check-fill fs-1 ${index === 0 ? 'text-primary' : 'text-muted'}"></i>`
+                            }
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mt-2 px-2">
+                                            <div class="text-center">
+                                                <div class="h5 fw-bold mb-0 text-primary">${scorePercent}%</div>
+                                                <small class="text-muted" style="font-size: 0.75rem;">相似度</small>
+                                            </div>
+                                            <div class="vr bg-secondary opacity-25"></div>
+                                            <div class="text-center">
+                                                <div class="text-dark fw-bold font-monospace small"><i class="bi bi-clock me-1"></i>${item.time}</div>
+                                                <small class="text-muted" style="font-size: 0.75rem;">出现时间</small>
+                                            </div>
+                                            <div class="vr bg-secondary opacity-25"></div>
+                                            <div class="text-center">
+                                                <div class="text-dark fw-bold font-monospace small"><i class="bi bi-film me-1"></i>${item.frame_index !== undefined ? item.frame_index : '-'}</div>
+                                                <small class="text-muted" style="font-size: 0.75rem;">帧索引</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>`);
+                    });
+                } else {
+                    topKContainer.html(`
+                        <div class="col-12 text-center py-5">
+                            <h5 class="text-secondary">未找到符合阈值 (>65%) 的目标行人</h5>
+                        </div>
+                    `);
+                }
+
+                $('#resultVideo')[0].src = state.resultVideoUrl;
+                $('#resultVideo')[0].load();
+            }
+        }
+    });
+</script>
+{% endblock %}

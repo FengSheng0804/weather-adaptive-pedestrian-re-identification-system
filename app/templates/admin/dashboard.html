@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}管理员仪表盘 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>管理员仪表盘</h2>
+        <p class="text-muted">全局数据概览与系统状态监控。</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-primary text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-people fs-1 mb-2"></i>
+                <h3 class="card-title">{{ total_users }}</h3>
+                <p class="card-text">总用户数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-info text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-list-task fs-1 mb-2"></i>
+                <h3 class="card-title">{{ total_tasks }}</h3>
+                <p class="card-text">总任务数</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-warning text-dark h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-hourglass-split fs-1 mb-2"></i>
+                <h3 class="card-title">{{ pending_tasks }}</h3>
+                <p class="card-text">处理中任务</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm bg-success text-white h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle fs-1 mb-2"></i>
+                <h3 class="card-title">{{ completed_tasks }}</h3>
+                <p class="card-text">已完成任务</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">快捷操作</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="{{ url_for('admin.users') }}"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        用户管理
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    <a href="{{ url_for('admin.tasks') }}"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        任务监控
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    <a href="{{ url_for('admin.system') }}"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        系统监控
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                    <a href="{{ url_for('admin.announcements') }}"
+                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        发布公告
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">系统状态</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        MoE 模型状态
+                        <span class="badge bg-success rounded-pill">正常</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        YOLOv11 模型状态
+                        <span class="badge bg-success rounded-pill">正常</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        ReID 模型状态
+                        <span class="badge bg-success rounded-pill">正常</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        数据库连接
+                        <span class="badge bg-success rounded-pill">正常</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

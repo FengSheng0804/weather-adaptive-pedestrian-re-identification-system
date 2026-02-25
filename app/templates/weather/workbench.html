@@ -1,0 +1,943 @@
+{% extends "base.html" %}
+
+{% block title %}复杂天气图像修复 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Global styles for this page */
+    .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: transform 0.2s ease-in-out;
+    }
+
+    .card-header {
+        background-color: #fff !important;
+        border-bottom: 2px solid #f0f2f5;
+        font-weight: 600;
+        padding: 1.25rem;
+        color: #333 !important;
+    }
+
+    .upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 12px;
+        padding: 60px 40px;
+        text-align: center;
+        background-color: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .upload-area:hover {
+        border-color: #0d6efd;
+        background-color: #f1f7ff;
+        transform: translateY(-2px);
+    }
+
+    .upload-area i {
+        font-size: 56px;
+        background: -webkit-linear-gradient(45deg, #0d6efd, #0dcaf0);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 15px;
+        display: inline-block;
+    }
+
+    /* Modern Progress Bar */
+    .progress {
+        height: 10px;
+        border-radius: 10px;
+        background-color: #e9ecef;
+        overflow: hidden;
+    }
+
+    .progress-bar {
+        background: linear-gradient(45deg, #0d6efd, #0dcaf0);
+    }
+
+    /* Comparison Container Styling */
+    .comparison-wrapper {
+        background: #000;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #333;
+    }
+
+    .comparison-container {
+        position: relative;
+        width: 100%;
+        margin: 0 auto;
+        overflow: hidden;
+        user-select: none;
+        -webkit-user-drag: none;
+        cursor: ew-resize;
+    }
+
+    .comparison-container img,
+    .comparison-container video {
+        width: 100%;
+        display: block;
+        height: auto;
+        pointer-events: none;
+    }
+
+    .comparison-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 50%;
+        height: 100%;
+        overflow: hidden;
+        border-right: 3px solid #fff;
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .comparison-overlay img,
+    .comparison-overlay video {
+        width: auto;
+        height: 100%;
+        max-width: none;
+    }
+
+    .comparison-slider {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 40px;
+        height: 100%;
+        margin-left: -20px;
+        background-color: transparent;
+        z-index: 10;
+    }
+
+    .comparison-slider::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 40px;
+        height: 40px;
+        margin-top: -20px;
+        margin-left: -20px;
+        background-color: #fff;
+        border-radius: 50%;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        transition: transform 0.2s;
+    }
+
+    .comparison-slider:hover::before {
+        transform: scale(1.1);
+    }
+
+    .comparison-slider::after {
+        content: '\f282';
+        /* Bootstrap icons bi-arrow-left-right */
+        font-family: bootstrap-icons;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: #0d6efd;
+        font-weight: bold;
+        font-size: 18px;
+    }
+
+    /* Metrics Styling */
+    .metric-value {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: -webkit-linear-gradient(45deg, #198754, #20c997);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        line-height: 1.2;
+    }
+
+    .metric-label {
+        color: #6c757d;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Experts Card Styling */
+    .expert-card-container {
+        padding: 10px;
+        border-radius: 8px;
+        background: #f8f9fa;
+        transition: transform 0.2s;
+    }
+
+    .expert-card-container:hover {
+        background: #fff;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        transform: translateY(-2px);
+    }
+
+    .expert-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        margin-bottom: 10px;
+        color: #495057;
+    }
+
+    .expert-media {
+        border-radius: 6px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h2>复杂天气图像修复工作台</h2>
+            <p class="text-muted">上传受雨、雪、雾影响的视频或图像，使用MoE架构进行智能修复。</p>
+        </div>
+        <button id="newTaskBtn" class="btn btn-outline-primary">
+            <i class="bi bi-plus-circle"></i> 新建任务
+        </button>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4 col-md-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header">
+                <i class="bi bi-cloud-upload text-primary me-2"></i> 上传文件
+            </div>
+            <div class="card-body p-4">
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                        <p class="mt-3 mb-1 fw-bold text-dark">点击或拖拽文件</p>
+                        <small class="text-secondary">支持 JPG, PNG, MP4, AVI</small>
+                    </div>
+                    <input type="file" id="fileInput" name="file" class="d-none" accept=".jpg,.jpeg,.png,.mp4,.avi">
+                </form>
+                <div id="uploadProgress" class="progress mt-4 d-none">
+                    <div class="progress-bar" role="progressbar"
+                        style="width: 0%"></div>
+                </div>
+                <div id="uploadStatus" class="mt-3 text-center fw-bold"></div>
+                <hr class="my-4">
+                <button id="processBtn" class="btn btn-primary w-100 py-2 fw-bold shadow-sm" disabled>
+                    <i class="bi bi-magic me-2"></i>开始修复 (MoE架构)
+                </button>
+                <div id="processProgressContainer" class="mt-4 d-none">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span class="text-muted small">处理中...</span>
+                        <span class="text-muted small fw-bold" id="processProgressText">0%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 6px;">
+                        <div id="processProgressBar"
+                            class="progress-bar progress-bar-striped progress-bar-animated bg-success"
+                            role="progressbar" style="width: 0%"></div>
+                    </div>
+                    <button id="cancelBtn" class="btn btn-sm btn-outline-danger w-100">终止任务</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm" id="metricsCard">
+            <div class="card-header">
+                <i class="bi bi-bar-chart-fill text-success me-2"></i> 处理结果指标
+            </div>
+            <div class="card-body p-4">
+                <div class="row text-center g-3">
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded-3 h-100">
+                            <h3 id="psnrValue" class="metric-value">-</h3>
+                            <p class="metric-label mb-0">PSNR (dB)</p>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-3 bg-light rounded-3 h-100">
+                            <h3 id="ssimValue" class="metric-value">-</h3>
+                            <p class="metric-label mb-0">SSIM</p>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="p-3 bg-light rounded-3">
+                            <h4 id="timeValue" class="text-info mb-0 fw-bold">-</h4>
+                            <p class="metric-label mb-0 mt-2">总耗时 (秒)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8 col-md-7">
+        <div class="card shadow-sm pb-3"> <!-- Added padding bottom manually -->
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-images text-primary me-2"></i> 效果对比</span>
+                <span id="processingSpinner" class="spinner-border spinner-border-sm text-primary d-none" role="status"
+                    aria-hidden="true"></span>
+            </div>
+            <div class="card-body p-0 d-flex align-items-center justify-content-center bg-dark rounded-bottom"
+                style="min-height: 500px; background: #1a1a1a;">
+                <div id="placeholderText" class="text-secondary text-center">
+                    <i class="bi bi-image fs-1 opacity-50"></i>
+                    <p class="mt-3 mb-0 text-white-50">上传并处理后在此处查看对比效果</p>
+                </div>
+
+                <div id="comparisonView" class="comparison-container d-none">
+                    <!-- Image comparison -->
+                    <div id="imageComparison" class="w-100 h-100 d-none">
+                        <img id="restoredImg" src="" alt="修复后">
+                        <div class="comparison-overlay" id="overlay">
+                            <img id="originalImg" src="" alt="原图">
+                        </div>
+                    </div>
+                    <!-- Video comparison -->
+                    <div id="videoComparison" class="w-100 h-100 d-none">
+                        <video id="restoredVideo" src="" autoplay loop muted playsinline></video>
+                        <div class="comparison-overlay" id="videoOverlay">
+                            <video id="originalVideo" src="" autoplay loop muted playsinline></video>
+                        </div>
+                    </div>
+                    <div class="comparison-slider" id="slider"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-4" id="expertsCard" style="display:none;">
+            <div class="card-header">
+                <i class="bi bi-diagram-3-fill text-info me-2"></i> 专家网络输出 (MoE中间结果)
+            </div>
+            <div class="card-body p-4">
+                <div class="row text-center g-3">
+                    <div class="col-md-4">
+                        <div class="expert-card-container h-100">
+                            <h6 class="expert-title"><i class="bi bi-cloud-haze me-1"></i> 去雾专家 (De-fog)</h6>
+                            <img id="defogImg" class="expert-media shadow-sm cursor-pointer" style="display:none;"
+                                onclick="showImageModal(this.src, '去雾专家输出')">
+                            <video id="defogVideo" class="expert-media shadow-sm" controls
+                                style="display:none;"></video>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="expert-card-container h-100">
+                            <h6 class="expert-title"><i class="bi bi-cloud-drizzle me-1"></i> 去雨专家 (De-rain)</h6>
+                            <img id="derainImg" class="expert-media shadow-sm cursor-pointer" style="display:none;"
+                                onclick="showImageModal(this.src, '去雨专家输出')">
+                            <video id="derainVideo" class="expert-media shadow-sm" controls
+                                style="display:none;"></video>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="expert-card-container h-100">
+                            <h6 class="expert-title"><i class="bi bi-snow me-1"></i> 去雪专家 (De-snow)</h6>
+                            <img id="desnowImg" class="expert-media shadow-sm cursor-pointer" style="display:none;"
+                                onclick="showImageModal(this.src, '去雪专家输出')">
+                            <video id="desnowVideo" class="expert-media shadow-sm" controls
+                                style="display:none;"></video>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Zoom Modal -->
+<div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-header border-0">
+                <h5 class="modal-title text-white" id="zoomModalTitle"></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"
+                    aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center p-0">
+                <img id="zoomedImage" src="" class="img-fluid rounded shadow-lg" style="max-height: 85vh;">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showImageModal(src, title) {
+        if (!src) return;
+        $('#zoomedImage').attr('src', src);
+        $('#zoomModalTitle').text(title);
+        new bootstrap.Modal(document.getElementById('imageZoomModal')).show();
+    }
+
+    $(document).ready(function () {
+        let uploadedFilename = '';
+        let taskId = '';
+        let originalUrl = '';
+
+        // New Task Button
+        $('#newTaskBtn').click(function () {
+            if (confirm('确定要新建任务吗？当前未保存的内容将被清空。')) {
+                // Clear sessionStorage
+                sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                sessionStorage.removeItem('{{ current_user.id }}_weatherWorkbenchState');
+
+                // Clear UI
+                $('#fileInput').val('');
+                uploadedFilename = '';
+                taskId = '';
+                originalUrl = '';
+                isVideo = false;
+
+                $('#uploadStatus').empty();
+                $('#processBtn').prop('disabled', true).html('开始修复 (MoE架构)');
+                $('#psnrValue').text('-');
+                $('#ssimValue').text('-');
+                $('#timeValue').text('-');
+
+                $('#placeholderText').removeClass('d-none');
+                $('#comparisonView').addClass('d-none');
+                $('#imageComparison').addClass('d-none');
+                $('#videoComparison').addClass('d-none');
+
+                // Hide progress
+                $('#processProgressContainer').addClass('d-none');
+                if (window.currentProgressInterval) {
+                    clearInterval(window.currentProgressInterval);
+                    window.currentProgressInterval = null;
+                }
+
+                // Reset slider
+                $('#overlay').css('width', '50%');
+                $('#videoOverlay').css('width', '50%');
+                $('#slider').css('left', '50%');
+
+                $('#uploadProgress').addClass('d-none');
+                $('.progress-bar').css('width', '0%');
+
+                // Clear Experts
+                $('#expertsCard').hide();
+                ['defog', 'derain', 'desnow'].forEach(exp => {
+                    $(`#${exp}Img`).hide().attr('src', '');
+                    $(`#${exp}Video`).hide().attr('src', '');
+                });
+            }
+        });
+
+        // File upload handling
+        $('#fileInput').change(function () {
+            if (this.files.length > 0) {
+                uploadFile(this.files[0]);
+            }
+        });
+
+        // Drag and drop
+        const dropZone = document.getElementById('dropZone');
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '#e9ecef';
+        });
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '';
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.style.backgroundColor = '';
+            if (e.dataTransfer.files.length > 0) {
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        let isVideo = false;
+
+        function syncVideoSize() {
+            if (isVideo) {
+                const restoredVideo = document.getElementById('restoredVideo');
+                const originalVideo = document.getElementById('originalVideo');
+                if (restoredVideo && originalVideo && restoredVideo.offsetWidth > 0) {
+                    originalVideo.style.width = restoredVideo.offsetWidth + 'px';
+                }
+            }
+        }
+        window.addEventListener('resize', syncVideoSize);
+
+        function uploadFile(file) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            isVideo = file.type.startsWith('video/');
+
+            $('#uploadProgress').removeClass('d-none');
+            $('#uploadStatus').html('<span class="text-info">正在上传...</span>');
+            $('#processBtn').prop('disabled', true);
+
+            $.ajax({
+                url: "{{ url_for('weather.upload') }}",
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                xhr: function () {
+                    const xhr = new window.XMLHttpRequest();
+                    xhr.upload.addEventListener("progress", function (evt) {
+                        if (evt.lengthComputable) {
+                            const percentComplete = evt.loaded / evt.total;
+                            $('#uploadProgress .progress-bar').css({
+                                width: percentComplete * 100 + '%'
+                            });
+                        }
+                    }, false);
+                    return xhr;
+                },
+                success: function (response) {
+                    uploadedFilename = response.filename;
+                    originalUrl = response.url;
+
+                    $('#uploadStatus').html('<span class="text-success"><i class="bi bi-check-circle"></i> 上传成功</span>');
+                    $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                    $('#psnrValue').text('-');
+                    $('#ssimValue').text('-');
+                    $('#timeValue').text('-');
+
+                    // Show original media in placeholder
+                    $('#placeholderText').addClass('d-none');
+                    $('#comparisonView').removeClass('d-none');
+
+                    if (isVideo) {
+                        $('#imageComparison').addClass('d-none');
+                        $('#videoComparison').removeClass('d-none');
+                        $('#originalVideo').attr('src', originalUrl);
+                        $('#restoredVideo').attr('src', originalUrl); // Temporary
+
+                        // Sync videos
+                        const v1 = document.getElementById('originalVideo');
+                        const v2 = document.getElementById('restoredVideo');
+                        v1.onplay = () => v2.play();
+                        v1.onpause = () => v2.pause();
+                        v1.onseeked = () => { v2.currentTime = v1.currentTime; };
+                        v2.onloadeddata = () => {
+                            syncVideoSize();
+                        };
+                    } else {
+                        $('#videoComparison').addClass('d-none');
+                        $('#imageComparison').removeClass('d-none');
+                        $('#originalImg').attr('src', originalUrl);
+                        $('#restoredImg').attr('src', originalUrl); // Temporary
+                    }
+
+                    // Reset slider
+                    $('#overlay').css('width', '50%');
+                    $('#videoOverlay').css('width', '50%');
+                    $('#slider').css('left', '50%');
+
+                    // Save state to sessionStorage so it survives tab switch
+                    sessionStorage.setItem('{{ current_user.id }}_weatherWorkbenchState', JSON.stringify({
+                        originalUrl: originalUrl,
+                        isVideo: isVideo,
+                        filename: uploadedFilename,
+                        status: 'uploaded'
+                    }));
+                },
+                error: function (xhr) {
+                    $('#uploadStatus').html('<span class="text-danger"><i class="bi bi-x-circle"></i> 上传失败: ' + xhr.responseJSON.error + '</span>');
+                    $('#uploadProgress').addClass('d-none');
+                }
+            });
+        }
+
+        // Process handling
+        $('#processBtn').click(function () {
+            if (!uploadedFilename) return;
+
+            $(this).prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...');
+            $('#processingSpinner').removeClass('d-none');
+
+            // Reset metrics
+            $('#psnrValue').text('-');
+            $('#ssimValue').text('-');
+            $('#timeValue').text('-');
+
+            // First create task
+            $.ajax({
+                url: "{{ url_for('weather.create_task') }}",
+                type: 'POST',
+                success: function (response) {
+                    taskId = response.task_id;
+                    startProcessing();
+                },
+                error: function () {
+                    $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                    $('#processingSpinner').addClass('d-none');
+                    alert('创建任务失败');
+                }
+            });
+        });
+
+        function startProcessing() {
+            // Show progress bar if video
+            let progressInterval = null;
+            if (isVideo) {
+                $('#processProgressContainer').removeClass('d-none');
+                $('#processProgressBar').css('width', '0%');
+                $('#processProgressText').text('处理进度: 0%');
+
+                progressInterval = setInterval(function () {
+                    $.get(`/weather/progress/${taskId}`, function (data) {
+                        if (data.status === 'failed' || data.status === 'cancelled') {
+                            clearInterval(progressInterval);
+                            window.currentProgressInterval = null;
+                            sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                            $('#processProgressContainer').addClass('d-none');
+                            $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                            $('#processingSpinner').addClass('d-none');
+                            alert(data.status === 'cancelled' ? '任务已终止' : '任务失败: 服务器重启或异常');
+                            return;
+                        }
+                        if (data.progress !== undefined) {
+                            $('#processProgressBar').css('width', data.progress + '%');
+                            $('#processProgressText').text(`处理进度: ${data.progress}%`);
+                        }
+                    });
+                }, 1000);
+
+                // Store interval ID in window object so it can be cleared if needed
+                window.currentProgressInterval = progressInterval;
+            }
+
+            const startTime = new Date().getTime();
+
+            // Store task info in sessionStorage to recover state if user navigates away
+            sessionStorage.setItem('{{ current_user.id }}_currentWeatherTask', JSON.stringify({
+                taskId: taskId,
+                filename: uploadedFilename,
+                isVideo: isVideo,
+                startTime: startTime,
+                originalUrl: originalUrl
+            }));
+
+            // Cancel button logic
+            $('#cancelBtn').off('click').on('click', function () {
+                if (!taskId) return;
+                if (confirm('确定要终止当前修复任务吗？')) {
+                    $.post(`/weather/cancel/${taskId}`, function (response) {
+                        if (progressInterval) {
+                            clearInterval(progressInterval);
+                            window.currentProgressInterval = null;
+                        }
+                        sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                        $('#processProgressContainer').addClass('d-none');
+                        $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                        $('#processingSpinner').addClass('d-none');
+                        alert('任务已终止');
+                    }).fail(function (xhr) {
+                        alert('终止失败: ' + (xhr.responseJSON ? xhr.responseJSON.error : '未知错误'));
+                    });
+                }
+            });
+
+            $.ajax({
+                url: "{{ url_for('weather.process') }}",
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    filename: uploadedFilename,
+                    task_id: taskId,
+                    weather_type: 'auto'
+                }),
+                success: function (response) {
+                    if (progressInterval) {
+                        clearInterval(progressInterval);
+                        window.currentProgressInterval = null;
+                        $('#processProgressBar').css('width', '100%');
+                        $('#processProgressText').text('处理进度: 100%');
+                        setTimeout(() => {
+                            $('#processProgressContainer').addClass('d-none');
+                        }, 2000);
+                    }
+
+                    // Clear stored task
+                    sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+
+                    const endTime = new Date().getTime();
+                    const timeTaken = ((endTime - startTime) / 1000).toFixed(2);
+
+                    $('#processBtn').html('<i class="bi bi-check2"></i> 处理完成');
+                    $('#processingSpinner').addClass('d-none');
+
+                    // Update comparison view
+                    if (isVideo) {
+                        $('#restoredVideo').attr('src', response.restored_url);
+                        const v1 = document.getElementById('originalVideo');
+                        const v2 = document.getElementById('restoredVideo');
+                        v2.onloadeddata = () => {
+                            v1.currentTime = 0;
+                            v2.currentTime = 0;
+                            v1.play();
+                            v2.play();
+                            syncVideoSize();
+                        };
+                    } else {
+                        $('#restoredImg').attr('src', response.restored_url);
+                    }
+
+                    // Show metrics
+                    $('#psnrValue').text(response.psnr.toFixed(2));
+                    $('#ssimValue').text(response.ssim.toFixed(4));
+                    $('#timeValue').text(timeTaken);
+
+                    // Show Experts
+                    if (response.expert_urls) {
+                        $('#expertsCard').fadeIn();
+                        const experts = ['defog', 'derain', 'desnow'];
+                        experts.forEach(exp => {
+                            if (response.expert_urls[exp]) {
+                                if (isVideo) {
+                                    $(`#${exp}Img`).hide();
+                                    $(`#${exp}Video`).attr('src', response.expert_urls[exp]).show();
+                                } else {
+                                    $(`#${exp}Video`).hide();
+                                    $(`#${exp}Img`).attr('src', response.expert_urls[exp]).show();
+                                }
+                            }
+                        });
+                    }
+
+                    // Save state to sessionStorage
+                    sessionStorage.setItem('{{ current_user.id }}_weatherWorkbenchState', JSON.stringify({
+                        originalUrl: originalUrl,
+                        restoredUrl: response.restored_url,
+                        expertUrls: response.expert_urls, // Save expert URLs
+                        isVideo: isVideo,
+                        psnr: response.psnr.toFixed(2),
+                        ssim: response.ssim.toFixed(4),
+                        time: timeTaken
+                    }));
+                },
+                error: function (xhr) {
+                    if (progressInterval) {
+                        clearInterval(progressInterval);
+                        window.currentProgressInterval = null;
+                    }
+                    sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                    $('#processProgressContainer').addClass('d-none');
+                    $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                    $('#processingSpinner').addClass('d-none');
+                    alert('处理失败: ' + (xhr.responseJSON ? xhr.responseJSON.error : '未知错误'));
+                }
+            });
+        }
+
+        // Check for ongoing task on page load
+        const storedTask = sessionStorage.getItem('{{ current_user.id }}_currentWeatherTask');
+        if (storedTask) {
+            const taskInfo = JSON.parse(storedTask);
+
+            // Check if task is still processing
+            $.get(`/weather/progress/${taskInfo.taskId}`, function (data) {
+                if (data.status === 'failed' || data.status === 'cancelled') {
+                    sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                    return;
+                }
+                if (data.progress !== undefined && data.progress < 100) {
+                    // Restore UI state
+                    uploadedFilename = taskInfo.filename;
+                    taskId = taskInfo.taskId;
+                    isVideo = taskInfo.isVideo;
+                    originalUrl = taskInfo.originalUrl;
+
+                    $('#uploadStatus').html('<span class="text-success"><i class="bi bi-check-circle"></i> 上传成功 (恢复状态)</span>');
+                    $('#processBtn').prop('disabled', true).html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...');
+                    $('#processingSpinner').removeClass('d-none');
+
+                    $('#placeholderText').addClass('d-none');
+                    $('#comparisonView').removeClass('d-none');
+
+                    if (isVideo) {
+                        $('#imageComparison').addClass('d-none');
+                        $('#videoComparison').removeClass('d-none');
+                        $('#originalVideo').attr('src', originalUrl);
+                        $('#restoredVideo').attr('src', originalUrl);
+
+                        $('#processProgressContainer').removeClass('d-none');
+                        $('#processProgressBar').css('width', data.progress + '%');
+                        $('#processProgressText').text(`处理进度: ${data.progress}%`);
+
+                        // Cancel button logic for restored state
+                        $('#cancelBtn').off('click').on('click', function () {
+                            if (!taskId) return;
+                            if (confirm('确定要终止当前修复任务吗？')) {
+                                $.post(`/weather/cancel/${taskId}`, function (response) {
+                                    if (window.currentProgressInterval) {
+                                        clearInterval(window.currentProgressInterval);
+                                        window.currentProgressInterval = null;
+                                    }
+                                    sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                                    $('#processProgressContainer').addClass('d-none');
+                                    $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                                    $('#processingSpinner').addClass('d-none');
+                                    alert('任务已终止');
+                                }).fail(function (xhr) {
+                                    alert('终止失败: ' + (xhr.responseJSON ? xhr.responseJSON.error : '未知错误'));
+                                });
+                            }
+                        });
+
+                        window.currentProgressInterval = setInterval(function () {
+                            $.get(`/weather/progress/${taskId}`, function (data) {
+                                if (data.status === 'failed' || data.status === 'cancelled') {
+                                    clearInterval(window.currentProgressInterval);
+                                    window.currentProgressInterval = null;
+                                    sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                                    $('#processProgressContainer').addClass('d-none');
+                                    $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                                    $('#processingSpinner').addClass('d-none');
+                                    alert(data.status === 'cancelled' ? '任务已终止' : '任务失败: 服务器重启或异常');
+                                    return;
+                                }
+                                if (data.progress !== undefined) {
+                                    $('#processProgressBar').css('width', data.progress + '%');
+                                    $('#processProgressText').text(`处理进度: ${data.progress}%`);
+
+                                    // If progress is 100 or task is done, we should probably poll for the final result
+                                    // For simplicity, we'll just let the user know it's done and they can check history
+                                    if (data.progress >= 100) {
+                                        clearInterval(window.currentProgressInterval);
+                                        $('#processBtn').html('<i class="bi bi-check2"></i> 处理完成 (请在历史记录查看)');
+                                        $('#processingSpinner').addClass('d-none');
+                                        sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                                    }
+                                }
+                            });
+                        }, 1000);
+                    } else {
+                        $('#videoComparison').addClass('d-none');
+                        $('#imageComparison').removeClass('d-none');
+                        $('#originalImg').attr('src', originalUrl);
+                        $('#restoredImg').attr('src', originalUrl);
+                    }
+                } else {
+                    // Task is done or not found, clear storage but ensure button is reset
+                    sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                    $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                    $('#processingSpinner').addClass('d-none');
+                }
+            }).fail(function () {
+                sessionStorage.removeItem('{{ current_user.id }}_currentWeatherTask');
+                $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+                $('#processingSpinner').addClass('d-none');
+            });
+        }
+
+        // Slider logic
+        let isDragging = false;
+        const slider = document.getElementById('slider');
+        const overlay = document.getElementById('overlay');
+        const videoOverlay = document.getElementById('videoOverlay');
+        const container = document.querySelector('.comparison-container');
+
+        slider.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            e.preventDefault(); // Prevent default drag behavior
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault(); // Prevent default drag behavior
+
+            const rect = container.getBoundingClientRect();
+            let x = e.clientX - rect.left;
+
+            // Constrain x
+            if (x < 0) x = 0;
+            if (x > rect.width) x = rect.width;
+
+            const percentage = (x / rect.width) * 100;
+
+            slider.style.left = percentage + '%';
+            overlay.style.width = percentage + '%';
+            videoOverlay.style.width = percentage + '%';
+        });
+
+        // Save button
+        $('#saveBtn').click(function () {
+            alert('已保存至个人空间！');
+            $(this).prop('disabled', true).html('<i class="bi bi-check"></i> 已保存');
+        });
+
+        // Restore state if exists
+        const savedState = sessionStorage.getItem('{{ current_user.id }}_weatherWorkbenchState');
+        if (savedState) {
+            const state = JSON.parse(savedState);
+            if (state.originalUrl && state.restoredUrl) {
+                $('#placeholderText').addClass('d-none');
+                $('#comparisonView').removeClass('d-none');
+
+                if (state.isVideo) {
+                    $('#imageComparison').addClass('d-none');
+                    $('#videoComparison').removeClass('d-none');
+                    $('#originalVideo').attr('src', state.originalUrl);
+                    $('#restoredVideo').attr('src', state.restoredUrl);
+                } else {
+                    $('#videoComparison').addClass('d-none');
+                    $('#imageComparison').removeClass('d-none');
+                    $('#originalImg').attr('src', state.originalUrl);
+                    $('#restoredImg').attr('src', state.restoredUrl);
+                }
+
+                $('#psnrValue').text(state.psnr);
+                $('#ssimValue').text(state.ssim);
+                $('#timeValue').text(state.time);
+
+                // Restore Experts
+                if (state.expertUrls) {
+                    $('#expertsCard').show();
+                    const experts = ['defog', 'derain', 'desnow'];
+                    experts.forEach(exp => {
+                        if (state.expertUrls[exp]) {
+                            if (state.isVideo) {
+                                $(`#${exp}Img`).hide();
+                                $(`#${exp}Video`).attr('src', state.expertUrls[exp]).show();
+                            } else {
+                                $(`#${exp}Video`).hide();
+                                $(`#${exp}Img`).attr('src', state.expertUrls[exp]).show();
+                            }
+                        }
+                    });
+                }
+            } else if (state.originalUrl && state.status === 'uploaded') {
+                // Restore uploaded but not processed state
+                uploadedFilename = state.filename;
+                originalUrl = state.originalUrl;
+                isVideo = state.isVideo;
+
+                $('#uploadStatus').html('<span class="text-success"><i class="bi bi-check-circle"></i> 上传成功</span>');
+                $('#processBtn').prop('disabled', false).html('开始修复 (MoE架构)');
+
+                $('#placeholderText').addClass('d-none');
+                $('#comparisonView').removeClass('d-none');
+
+                if (isVideo) {
+                    $('#imageComparison').addClass('d-none');
+                    $('#videoComparison').removeClass('d-none');
+                    $('#originalVideo').attr('src', originalUrl);
+                    $('#restoredVideo').attr('src', originalUrl); // Temporary
+                } else {
+                    $('#videoComparison').addClass('d-none');
+                    $('#imageComparison').removeClass('d-none');
+                    $('#originalImg').attr('src', originalUrl);
+                    $('#restoredImg').attr('src', originalUrl); // Temporary
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

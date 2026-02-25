@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}用户仪表盘 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>欢迎回来, {{ current_user.username }}</h2>
+        <p class="text-muted">这里是您的个人工作台，您可以快速访问各项功能。</p>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-cloud-sun fs-1 text-primary mb-3"></i>
+                <h4 class="card-title">复杂天气图像修复</h4>
+                <p class="card-text">上传受雨、雪、雾影响的视频，使用MoE架构进行智能修复。</p>
+                <a href="{{ url_for('weather.workbench') }}" class="btn btn-primary">进入工作台</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body text-center">
+                <i class="bi bi-person-bounding-box fs-1 text-success mb-3"></i>
+                <h4 class="card-title">行人再识别</h4>
+                <p class="card-text">上传查询视频和检索视频，快速定位目标行人并生成结果。</p>
+                <a href="{{ url_for('reid.workbench') }}" class="btn btn-success">进入工作台</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">最近处理记录</h5>
+            </div>
+            <div class="card-body">
+                {% if recent_tasks %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>任务ID</th>
+                                <th>任务类型</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                                <th>完成时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in recent_tasks %}
+                            <tr>
+                                <td>{{ task.id }}</td>
+                                <td>
+                                    {% if task.task_type == 'weather_restoration' %}
+                                    <span class="badge bg-primary">天气修复</span>
+                                    {% else %}
+                                    <span class="badge bg-success">行人检索</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if task.status == 'completed' %}
+                                    <span class="badge bg-success">已完成</span>
+                                    {% elif task.status == 'processing' %}
+                                    <span class="badge bg-warning text-dark">处理中</span>
+                                    {% elif task.status == 'failed' %}
+                                    <span class="badge bg-danger">失败</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">等待中</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ task.created_at|beijing_time }}</td>
+                                <td>{{ task.completed_at|beijing_time if task.completed_at else '-' }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-end">
+                    <a href="{{ url_for('user.history') }}" class="btn btn-sm btn-outline-secondary">查看全部记录</a>
+                </div>
+                {% else %}
+                <p class="text-center text-muted my-4">暂无处理记录</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

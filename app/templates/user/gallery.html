@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}我的图库 - 复杂天气环境下的行人再识别系统{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>我的图库</h2>
+        <p class="text-muted">管理您上传的所有原图和修复后的图片。</p>
+    </div>
+</div>
+
+<div class="row">
+    {% if images.items %}
+    {% for image in images.items %}
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="comparison-container"
+                style="height: 200px; position: relative; overflow: hidden; cursor: ew-resize; user-select: none; -webkit-user-select: none;">
+                <img src="{{ url_for('static', filename='output/restored/images/' + image.restored_path) }}"
+                    class="card-img-top" alt="修复后图片"
+                    style="height: 100%; width: 100%; object-fit: cover; position: absolute; top: 0; left: 0; pointer-events: none; -webkit-user-drag: none;">
+                <div class="comparison-overlay"
+                    style="position: absolute; top: 0; left: 0; width: 50%; height: 100%; overflow: hidden; border-right: 2px solid white; pointer-events: none;">
+                    <img src="{{ url_for('static', filename='uploads/images/' + image.original_path) }}" alt="原图"
+                        class="overlay-img"
+                        style="height: 100%; width: 100%; object-fit: cover; max-width: none; pointer-events: none; -webkit-user-drag: none;">
+                </div>
+                <div class="comparison-slider"
+                    style="position: absolute; top: 0; left: 50%; width: 40px; height: 100%; margin-left: -20px; background-color: transparent; z-index: 10;">
+                    <div
+                        style="position: absolute; top: 50%; left: 50%; width: 30px; height: 30px; margin-top: -15px; margin-left: -15px; background-color: white; border-radius: 50%; box-shadow: 0 0 5px rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; color: #333;">
+                        &lt;&gt;</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <h6 class="card-title text-truncate" title="{{ image.original_path }}">{{ image.original_path }}</h6>
+                <p class="card-text small text-muted mb-1">
+                    <i class="bi bi-calendar3"></i> {{ image.created_at|beijing_time }}<br>
+                    <i class="bi bi-cpu"></i> 模型: {{ image.model_used }}<br>
+                    <i class="bi bi-bar-chart"></i> PSNR: {{ "%.2f"|format(image.psnr) }}<br>
+                    <i class="bi bi-clock"></i> 耗时: {{ "%.2f"|format(image.processing_time) }}s
+                </p>
+            </div>
+            <div class="card-footer bg-white border-top-0 d-flex justify-content-between">
+                <a href="{{ url_for('static', filename='output/restored/images/' + image.restored_path) }}"
+                    class="btn btn-sm btn-outline-primary" target="_blank">预览</a>
+                <a href="{{ url_for('static', filename='output/restored/images/' + image.restored_path) }}"
+                    class="btn btn-sm btn-outline-success" download>下载</a>
+                <button class="btn btn-sm btn-outline-danger delete-btn" data-id="{{ image.id }}"
+                    data-type="image">删除</button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="col-md-12 text-center my-5">
+        <i class="bi bi-images fs-1 text-muted"></i>
+        <p class="mt-3 text-muted">您的图库空空如也，快去<a href="{{ url_for('weather.workbench') }}">天气修复工作台</a>处理一些图片吧！</p>
+    </div>
+    {% endif %}
+</div>
+
+{% if images.pages > 1 %}
+<nav aria-label="Page navigation">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not images.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('user.gallery', page=images.prev_num) }}">上一页</a>
+        </li>
+        {% for page_num in images.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+        {% if page_num %}
+        <li class="page-item {% if page_num == images.page %}active{% endif %}">
+            <a class="page-link" href="{{ url_for('user.gallery', page=page_num) }}">{{ page_num }}</a>
+        </li>
+        {% else %}
+        <li class="page-item disabled"><span class="page-link">...</span></li>
+        {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not images.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('user.gallery', page=images.next_num) }}">下一页</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+
+<div class="modal fade" id="imageModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 position-relative text-center">
+                <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 z-3" data-bs-dismiss="modal" aria-label="Close"></button>
+                <img src="" class="img-fluid rounded shadow-lg" id="modalImage" style="max-height: 90vh;">
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function () {
+        // Comparison slider logic
+        function updateOverlayImageSize() {
+
+            $('.comparison-container').each(function () {
+                const container = $(this);
+                const width = container.width();
+                // Set the width of the image inside the overlay to match the container width
+                container.find('.comparison-overlay img').css('width', width + 'px');
+            });
+        }
+
+        // Initial set
+        updateOverlayImageSize();
+
+        // Update on resize
+        $(window).resize(updateOverlayImageSize);
+
+        $('.comparison-container').each(function () {
+            const container = $(this);
+            const overlay = container.find('.comparison-overlay');
+            const slider = container.find('.comparison-slider');
+            let isDown = false;
+
+            function moveSlider(e) {
+                if (!isDown) return;
+                const rect = container[0].getBoundingClientRect();
+                let x = (e.pageX || e.originalEvent.touches[0].pageX) - rect.left;
+                x = Math.max(0, Math.min(x, rect.width));
+                const percent = (x / rect.width) * 100;
+                overlay.css('width', percent + '%');
+                slider.css('left', percent + '%');
+            }
+
+            container.on('mousedown touchstart', function (e) {
+                isDown = true;
+                e.preventDefault(); // Prevent text selection
+                moveSlider(e);
+            });
+
+            container.on('dragstart', function (e) {
+                e.preventDefault(); // Prevent native drag
+            });
+
+            $(window).on('mouseup touchend', function () {
+                isDown = false;
+            });
+
+            $(window).on('mousemove touchmove', function (e) {
+                if (isDown) {
+                    e.preventDefault(); // Prevent selection while dragging
+                    moveSlider(e);
+                }
+            });
+
+            // Double click to enlarge
+            container.on('dblclick', function() {
+                 const src = $(this).find('.card-img-top').attr('src');
+                 $('#modalImage').attr('src', src);
+                 new bootstrap.Modal(document.getElementById('imageModal')).show();
+            });
+        });
+
+        // Preview button also triggers modal
+        $('.btn-outline-primary').click(function(e) {
+            e.preventDefault();
+            const src = $(this).attr('href');
+            $('#modalImage').attr('src', src);
+            new bootstrap.Modal(document.getElementById('imageModal')).show();
+        });
+
+        $('.delete-btn').click(function () {
+            if (!confirm('确定要删除这条记录吗？')) {
+                return;
+            }
+
+            const btn = $(this);
+            const id = btn.data('id');
+
+            $.ajax({
+                url: `/user/delete_image/${id}`,
+                type: 'POST',
+                success: function (response) {
+                    if (response.success) {
+                        // 移除对应的卡片
+                        btn.closest('.col-md-3').fadeOut(300, function () {
+                            $(this).remove();
+                            // 如果页面上没有卡片了，可以刷新页面显示空状态
+                            if ($('.col-md-3').length === 0) {
+                                location.reload();
+                            }
+                        });
+                    } else {
+                        alert('删除失败：' + response.message);
+                    }
+                },
+                error: function () {
+                    alert('删除请求失败，请稍后重试');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
